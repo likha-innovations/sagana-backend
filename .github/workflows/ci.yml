@@ -1,0 +1,49 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma & Zod Schemas
+        run: npx prisma generate
+
+      - name: Lint Code
+        run: pnpm run lint
+
+      - name: Build Application
+        run: pnpm run build
+
+      - name: Run Unit Tests
+        run: pnpm run test
+
+      # Optional: Uncomment if you want to run e2e tests in CI. 
+      # Note: This requires setting up a test database via Postgres service.
+      # - name: Run E2E Tests
+      #   run: pnpm run test:e2e
+      #   env:
+      #     DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
