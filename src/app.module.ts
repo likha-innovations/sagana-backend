@@ -5,6 +5,10 @@ import { AppController } from './app.controller';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { validate } from './core/config/env.validation';
 import { LoggerModule } from './core/logger/logger.module';
+import { UsersModule } from './modules/users/users.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { APP_GUARD } from '@nestjs/core';
+import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
 
 @Module({
   imports: [
@@ -20,8 +24,15 @@ import { LoggerModule } from './core/logger/logger.module';
     ]),
     DatabaseModule,
     LoggerModule,
+    UsersModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ClerkAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
