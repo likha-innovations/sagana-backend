@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, ConsoleLogger } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import * as path from 'path';
