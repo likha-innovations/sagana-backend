@@ -1,0 +1,15 @@
+meta {
+  name: Get Profile (Me)
+  type: http
+  seq: 3
+}
+
+get {
+  url: http://localhost:3000/api/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: YOUR_CLERK_TOKEN_HERE
+}

@@ -1,0 +1,23 @@
+meta {
+  name: Update Profile (Me)
+  type: http
+  seq: 4
+}
+
+patch {
+  url: http://localhost:3000/api/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: YOUR_CLERK_TOKEN_HERE
+}
+
+body:json {
+  {
+    "fullName": "Updated Name",
+    "contactNumber": "09123456789",
+    "location": "Manila, Philippines"
+  }
+}
