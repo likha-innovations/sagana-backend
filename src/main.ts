@@ -4,6 +4,7 @@ import { GlobalExceptionFilter } from './core/exceptions/global-exception.filter
 import { TransformResponseInterceptor } from './core/interceptors/transform-response.interceptor';
 import { LoggerService } from './core/logger/logger.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { patchNestJsSwagger } from 'nestjs-zod';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -17,10 +18,13 @@ async function bootstrap() {
   const apiPrefix = process.env.API_PREFIX || '';
   if (apiPrefix) app.setGlobalPrefix(apiPrefix);
 
+  patchNestJsSwagger();
+
   const config = new DocumentBuilder()
-    .setTitle('API')
+    .setTitle('Sagana Backend API')
     .setDescription('The API documentation')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
