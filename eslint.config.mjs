@@ -6,7 +6,12 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: [
+      'eslint.config.mjs',
+      'dist/**',
+      'docs/.vitepress/cache/**',
+      'docs/.vitepress/dist/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -19,7 +24,16 @@ export default tseslint.config(
       },
       sourceType: 'commonjs',
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: [
+            '*.ts',
+            '*.mts',
+            '*.mjs',
+            '*.js',
+            'docs/**/*.ts',
+            'docs/**/*.mts',
+          ],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
