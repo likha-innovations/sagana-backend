@@ -36,7 +36,7 @@ export class ClerkAuthGuard implements CanActivate {
       });
       request['user'] = { id: payload.sub };
       return true;
-    } catch (err) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
   }
