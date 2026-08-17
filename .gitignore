@@ -36,5 +36,6 @@ coverage/
 # Documentation
 documentation/
 
-#Vitepress
-cache
+# Vitepress
+docs/.vitepress/cache/
+docs/.vitepress/dist/
