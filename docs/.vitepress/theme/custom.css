@@ -1,19 +1,61 @@
-/* Mermaid Diagram Font & Spacing Overrides */
+/* Mermaid Diagram Centering and Flow */
+.mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+
 .mermaid svg {
   max-width: 100%;
+  height: auto;
 }
 
-.mermaid text,
-.mermaid .node text,
-.mermaid .node .label,
-.mermaid .edgeLabel,
-.mermaid .edgeLabel text,
-.mermaid .label text,
-.mermaid .actor text,
-.mermaid .messageText {
+/* Reset any VitePress margins and paddings inside Mermaid */
+.mermaid .node foreignObject,
+.mermaid .node foreignObject *,
+.mermaid .edgeLabel foreignObject,
+.mermaid .edgeLabel foreignObject * {
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Perfectly vertically center node text without double-offset */
+.mermaid .node foreignObject {
+  overflow: visible !important;
+}
+
+.mermaid .node foreignObject > div {
+  width: 100% !important;
+  height: 100% !important;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
   font-size: 13px !important;
+  line-height: 1.35 !important;
+  text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-.mermaid .node code {
-  font-size: 11.5px !important;
+.mermaid .node foreignObject span.nodeLabel {
+  display: inline-block !important;
+  line-height: 1.35 !important;
 }
+
+/* Edge labels */
+.mermaid .edgeLabel foreignObject {
+  overflow: visible !important;
+}
+
+.mermaid .edgeLabel foreignObject > div {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  padding: 2px 8px !important;
+  background-color: var(--vp-c-bg) !important;
+  border: 1px solid var(--vp-c-divider) !important;
+  border-radius: 4px !important;
+  white-space: nowrap !important;
+}
+

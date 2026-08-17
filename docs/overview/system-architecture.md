@@ -17,8 +17,8 @@ flowchart TD
     Validation --> Handler["5. Controller & Domain Service Execution"]
     
     Handler --> Result{Execution Result}
-    Result -->|Success| Interceptor["6. TransformResponseInterceptor<br/><code>{ success: true, data: {...}, timestamp }</code>"]
-    Result -->|Exception / Error| Filter["7. GlobalExceptionFilter<br/><code>{ success: false, statusCode, message, timestamp }</code>"]
+    Result -->|Success| Interceptor["6. TransformResponseInterceptor<br/>{ success: true, data: {...}, timestamp }"]
+    Result -->|Exception / Error| Filter["7. GlobalExceptionFilter<br/>{ success: false, statusCode, message, timestamp }"]
     
     Interceptor --> Response["📤 JSON HTTP Response"]
     Filter --> Response

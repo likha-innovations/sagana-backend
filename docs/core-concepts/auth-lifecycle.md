@@ -26,7 +26,7 @@ providers: [
 
 ```mermaid
 flowchart TD
-    Client["1. 📱 Client sends Request<br/><code>Authorization: Bearer &lt;jwt&gt;</code>"] --> Guard["2. ClerkAuthGuard Intercepts"]
+    Client["1. 📱 Client sends Request<br/>Authorization: Bearer &lt;jwt&gt;"] --> Guard["2. ClerkAuthGuard Intercepts"]
     Guard --> CheckPublic{"Has @Public() metadata?"}
     
     CheckPublic -->|YES| Allow["✅ Allow Request (e.g. /health)"]
@@ -37,9 +37,9 @@ flowchart TD
     
     VerifyJWT --> CheckValid{"Is Token Valid?"}
     CheckValid -->|Invalid / Expired| ErrInvalid["❌ 401 Unauthorized (Invalid Token)"]
-    CheckValid -->|Valid| Attach["Attach Claims to Request<br/><code>req.user = { id: payload.sub }</code>"]
+    CheckValid -->|Valid| Attach["Attach Claims to Request<br/>req.user = { id: payload.sub }"]
     
-    Attach --> Handler["3. Controller Handler Executes<br/><code>@CurrentUserId() extracts req.user.id</code>"]
+    Attach --> Handler["3. Controller Handler Executes<br/>@CurrentUserId() extracts req.user.id"]
 ```
 
 ---

@@ -97,11 +97,16 @@ export default withMermaid(
     },
     mermaid: {
       themeVariables: {
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
         fontSize: '13px',
       },
       flowchart: {
         useMaxWidth: true,
         htmlLabels: true,
+        padding: 20,
+        nodeSpacing: 45,
+        rankSpacing: 45,
+        curve: 'basis',
       },
     },
     vite: {

@@ -8,19 +8,19 @@ The **Webhooks Module** listens for real-time user lifecycle events dispatched f
 
 ```mermaid
 flowchart TD
-    Clerk["☁️ Clerk Cloud Service<br/><code>POST /webhooks/clerk</code><br/>(Svix HMAC Headers)"] --> Controller["🛰️ WebhooksController<br/>• Extracts raw request body<br/>• Reads svix headers"]
+    Clerk["☁️ Clerk Cloud Service<br/>POST /webhooks/clerk<br/>(Svix HMAC Headers)"] --> Controller["🛰️ WebhooksController<br/>• Extracts raw request body<br/>• Reads svix headers"]
     
     Controller --> Svix["Verify HMAC signature via Svix SDK<br/>using CLERK_WEBHOOK_SECRET"]
     
     Svix --> VerifyCheck{Signature Valid?}
-    VerifyCheck -->|No / Spoofed| Err["❌ 400 Bad Request<br/><code>'Invalid webhook signature'</code>"]
+    VerifyCheck -->|No / Spoofed| Err["❌ 400 Bad Request<br/>'Invalid webhook signature'"]
     
     VerifyCheck -->|Yes| TypeCheck{Inspect event.type}
     
-    TypeCheck -->|user.created<br/>user.updated| Upsert["🗄️ Upsert local User record<br/><code>Prisma.user.upsert(...)</code>"]
-    TypeCheck -->|user.deleted| Delete["🗑️ Delete local User record<br/><code>Prisma.user.delete(...)</code>"]
+    TypeCheck -->|user.created / updated| Upsert["🗄️ Upsert local User record<br/>Prisma.user.upsert(...)"]
+    TypeCheck -->|user.deleted| Delete["🗑️ Delete local User record<br/>Prisma.user.delete(...)"]
     
-    Upsert --> Success["✅ Return 200 OK<br/><code>{ success: true, message: 'Webhook processed' }</code>"]
+    Upsert --> Success["✅ Return 200 OK<br/>{ success: true, message: 'Webhook processed' }"]
     Delete --> Success
 ```
 
