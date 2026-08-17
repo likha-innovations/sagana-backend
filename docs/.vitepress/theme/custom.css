@@ -1,0 +1,19 @@
+/* Mermaid Diagram Font & Spacing Overrides */
+.mermaid svg {
+  max-width: 100%;
+}
+
+.mermaid text,
+.mermaid .node text,
+.mermaid .node .label,
+.mermaid .edgeLabel,
+.mermaid .edgeLabel text,
+.mermaid .label text,
+.mermaid .actor text,
+.mermaid .messageText {
+  font-size: 13px !important;
+}
+
+.mermaid .node code {
+  font-size: 11.5px !important;
+}

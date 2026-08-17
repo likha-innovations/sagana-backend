@@ -8,32 +8,20 @@ Sagana Backend is structured as a modular, type-safe API server adhering to clea
 
 Every incoming HTTP request travels through a unified pipeline of guards, interceptors, and exception filters before and after reaching the controller handler:
 
-```
-  📱 Client App (Mobile / Web / Webhook)
-                   │
-                   ▼
-  ┌────────────────────────────────────────────────────────┐
-  │              NestJS Application Pipeline               │
-  │                                                        │
-  │  1. CORS & Raw Body Middleware                         │
-  │  2. Throttler Guard (Rate Limit: 100 req/min)          │
-  │  3. ClerkAuthGuard (Global Authentication)             │
-  │  4. ZodValidationPipe (Input Validation)               │
-  │  5. Controller & Domain Service Execution              │
-  │  6. TransformResponseInterceptor (Standard Envelope)   │
-  └────────────────────────┬───────────────────────────────┘
-                           │
-           ┌───────────────┴───────────────┐
-           │                               │
-  [ Successful Execution ]         [ Unhandled Error ]
-           │                               │
-           ▼                               ▼
-  ┌──────────────────────┐        ┌──────────────────────┐
-  │ Response Interceptor │        │ GlobalExceptionFilter│
-  │  { success: true,    │        │  { success: false,   │
-  │    data: {...},      │        │    statusCode: 4xx,  │
-  │    timestamp: "..." }│        │    message: "..." }  │
-  └──────────────────────┘        └──────────────────────┘
+```mermaid
+flowchart TD
+    Client["📱 Client App (Mobile / Web / Webhook)"] --> Middleware["1. CORS & Raw Body Middleware"]
+    Middleware --> Throttler["2. ThrottlerGuard (Rate Limit: 100 req/min)"]
+    Throttler --> Auth["3. ClerkAuthGuard (JWT Verification)"]
+    Auth --> Validation["4. ZodValidationPipe (DTO Parsing)"]
+    Validation --> Handler["5. Controller & Domain Service Execution"]
+    
+    Handler --> Result{Execution Result}
+    Result -->|Success| Interceptor["6. TransformResponseInterceptor<br/><code>{ success: true, data: {...}, timestamp }</code>"]
+    Result -->|Exception / Error| Filter["7. GlobalExceptionFilter<br/><code>{ success: false, statusCode, message, timestamp }</code>"]
+    
+    Interceptor --> Response["📤 JSON HTTP Response"]
+    Filter --> Response
 ```
 
 ---

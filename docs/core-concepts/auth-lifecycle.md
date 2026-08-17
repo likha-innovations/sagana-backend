@@ -24,37 +24,22 @@ providers: [
 
 ## 🧭 Authentication Lifecycle Flow
 
-```
-   1. Client (Mobile/Web) sends HTTP Request with Header:
-      Authorization: Bearer <clerk_session_jwt>
-                     │
-                     ▼
-   2. NestJS Global ClerkAuthGuard intercepts the request:
-      Does the route/controller have @Public() metadata?
-                     │
-         ┌───────────┴───────────┐
-         │ YES                   │ NO (Protected Endpoint)
-         ▼                       ▼
-   [ Allow Request ]       Extract Bearer Token from Authorization Header
-   (e.g. /health)                │
-                                 ▼
-                           Is Token Present?
-                                 │
-                     ┌───────────┴───────────┐
-                     │ NO                    │ YES
-                     ▼                       ▼
-               [ 401 Error ]           Verify JWT with Clerk SDK
-               (Missing Token)         using CLERK_SECRET_KEY
-                                             │
-                                 ┌───────────┴───────────┐
-                                 │ Valid                 │ Expired / Invalid
-                                 ▼                       ▼
-                           Attach user ID:         [ 401 Error ]
-                           req.user = { id }       (Invalid Token)
-                                 │
-                                 ▼
-                     3. Controller Handler Executes
-                     (@CurrentUserId() extracts req.user.id)
+```mermaid
+flowchart TD
+    Client["1. 📱 Client sends Request<br/><code>Authorization: Bearer &lt;jwt&gt;</code>"] --> Guard["2. ClerkAuthGuard Intercepts"]
+    Guard --> CheckPublic{"Has @Public() metadata?"}
+    
+    CheckPublic -->|YES| Allow["✅ Allow Request (e.g. /health)"]
+    CheckPublic -->|NO| CheckToken{"Bearer Token Present?"}
+    
+    CheckToken -->|NO| ErrMissing["❌ 401 Unauthorized (Missing Token)"]
+    CheckToken -->|YES| VerifyJWT["Verify JWT via Clerk SDK & CLERK_SECRET_KEY"]
+    
+    VerifyJWT --> CheckValid{"Is Token Valid?"}
+    CheckValid -->|Invalid / Expired| ErrInvalid["❌ 401 Unauthorized (Invalid Token)"]
+    CheckValid -->|Valid| Attach["Attach Claims to Request<br/><code>req.user = { id: payload.sub }</code>"]
+    
+    Attach --> Handler["3. Controller Handler Executes<br/><code>@CurrentUserId() extracts req.user.id</code>"]
 ```
 
 ---

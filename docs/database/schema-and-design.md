@@ -29,7 +29,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
 ---
 
-## 📐 Database Models
+## 📐 Database Models & Entity Relationship
+
+```mermaid
+erDiagram
+    users {
+        string id PK "Clerk User ID (user_...)"
+        string fullName "Optional full name"
+        string email UK "Unique email address"
+        string contactNumber "Optional phone number"
+        string location "Optional location"
+        datetime createdAt "Record creation timestamp"
+        datetime updatedAt "Auto-updated timestamp"
+    }
+```
 
 ### `User` Model (`users` table)
 

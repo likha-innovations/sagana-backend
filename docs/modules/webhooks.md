@@ -6,44 +6,22 @@ The **Webhooks Module** listens for real-time user lifecycle events dispatched f
 
 ## 🛰️ Webhook Lifecycle Flow
 
-```
-   ┌─────────────────────────────────────────────────────────────┐
-   │                  Clerk Cloud Service                        │
-   │  (Dispatches POST /webhooks/clerk with Svix HMAC Headers)   │
-   └──────────────────────────────┬──────────────────────────────┘
-                                  │
-                                  ▼
-   ┌─────────────────────────────────────────────────────────────┐
-   │         NestJS WebhooksController (src/modules/webhooks)    │
-   │       • Extracts raw body from Express request buffer       │
-   │       • Reads svix-id, svix-timestamp, svix-signature       │
-   └──────────────────────────────┬──────────────────────────────┘
-                                  │
-                                  ▼
-                     ┌──────────────────────────┐
-                     │ Verify with Svix SDK     │
-                     │  using Webhook Secret    │
-                     └────────────┬─────────────┘
-                                  │
-                 ┌────────────────┴────────────────┐
-                 │                                 │
-           [ Invalid / Spoofed ]             [ Valid Payload ]
-                 │                                 │
-                 ▼                                 ▼
-   ┌──────────────────────────┐     ┌───────────────────────────────┐
-   │  400 Bad Request Error   │     │ Inspect event.type:           │
-   │  ("Invalid signature")   │     │                               │
-   └──────────────────────────┘     │ • user.created / user.updated │
-                                    │   └── Upsert into PostgreSQL  │
-                                    │                               │
-                                    │ • user.deleted                │
-                                    │   └── Delete from PostgreSQL  │
-                                    └──────────────┬────────────────┘
-                                                   │
-                                                   ▼
-                                    ┌───────────────────────────────┐
-                                    │ Return 200 OK { success: true }│
-                                    └───────────────────────────────┘
+```mermaid
+flowchart TD
+    Clerk["☁️ Clerk Cloud Service<br/><code>POST /webhooks/clerk</code><br/>(Svix HMAC Headers)"] --> Controller["🛰️ WebhooksController<br/>• Extracts raw request body<br/>• Reads svix headers"]
+    
+    Controller --> Svix["Verify HMAC signature via Svix SDK<br/>using CLERK_WEBHOOK_SECRET"]
+    
+    Svix --> VerifyCheck{Signature Valid?}
+    VerifyCheck -->|No / Spoofed| Err["❌ 400 Bad Request<br/><code>'Invalid webhook signature'</code>"]
+    
+    VerifyCheck -->|Yes| TypeCheck{Inspect event.type}
+    
+    TypeCheck -->|user.created<br/>user.updated| Upsert["🗄️ Upsert local User record<br/><code>Prisma.user.upsert(...)</code>"]
+    TypeCheck -->|user.deleted| Delete["🗑️ Delete local User record<br/><code>Prisma.user.delete(...)</code>"]
+    
+    Upsert --> Success["✅ Return 200 OK<br/><code>{ success: true, message: 'Webhook processed' }</code>"]
+    Delete --> Success
 ```
 
 ---
