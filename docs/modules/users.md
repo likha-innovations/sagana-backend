@@ -6,10 +6,21 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 
 ## 📍 Endpoints Overview
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Protected | Description |
 | :--- | :--- | :--- | :--- |
-| **`GET`** | `/me` | Bearer JWT | Retrieves the database profile for the currently logged-in user. |
-| **`PATCH`** | `/me` | Bearer JWT | Partially updates profile fields (`fullName`, `contactNumber`, `location`). |
+| **`GET`** | `/me` | 🔒 Yes | Retrieves the database profile for the currently logged-in user. |
+| **`PATCH`** | `/me` | 🔒 Yes | Partially updates profile fields (`fullName`, `contactNumber`, `location`). |
+
+::: info 🛡️ Protected Routes Information
+* **Global Guard**: Protected endpoints require authentication enforced globally by [`ClerkAuthGuard`](../../src/core/guards/clerk-auth.guard.ts).
+* **Required Header**: Clients must supply a valid Clerk session token via the Authorization header:
+  ```http
+  Authorization: Bearer <clerk_session_jwt>
+  ```
+* **Request Context**: Once verified, the decoded Clerk user ID (`sub`) is automatically attached to `request.user.id` for downstream services.
+* **Unauthorized Access**: Requests with missing, expired, or malformed tokens will immediately receive a `401 Unauthorized` response.
+* **Public Endpoints**: Only endpoints explicitly decorated with `@Public()` (such as webhooks or public health checks) bypass authentication.
+:::
 
 ---
 
