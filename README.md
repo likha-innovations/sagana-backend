@@ -1,98 +1,290 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🌱 Sagana Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> Robust, high-performance NestJS 11 enterprise backend powering the **Sagana Smart Agriculture & IoT Management Platform**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+[![NestJS](https://img.shields.io/badge/NestJS-v11.0-E0234E?style=flat-square&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-v5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-v7.9-2D3748?style=flat-square&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Neon PostgreSQL](https://img.shields.io/badge/Database-Neon%20PostgreSQL-00E599?style=flat-square&logo=postgresql&logoColor=white)](https://neon.tech/)
+[![Clerk Auth](https://img.shields.io/badge/Auth-Clerk-6C47FF?style=flat-square&logo=clerk&logoColor=white)](https://clerk.com/)
+[![VitePress Docs](https://img.shields.io/badge/Docs-VitePress-42B883?style=flat-square&logo=vite&logoColor=white)](https://vitepress.dev/)
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 📖 Table of Contents
 
-## Project setup
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Tech Stack](#-tech-stack)
+- [System Architecture](#-system-architecture)
+- [Folder Structure](#-folder-structure)
+- [Prerequisites](#-prerequisites)
+- [Environment Configuration](#-environment-configuration)
+- [Quick Start](#-quick-start)
+- [Database Management](#-database-management)
+- [API Documentation & Swagger](#-api-documentation--swagger)
+- [Interactive Documentation Site](#-interactive-documentation-site)
+- [Authentication & Mobile Sync](#-authentication--mobile-sync)
+- [Deployment (Render)](#-deployment-render)
+- [Scripts Reference](#-scripts-reference)
 
-```bash
-$ pnpm install
+---
+
+## 🌟 Overview
+
+**Sagana Backend** is the central application server for the Sagana agricultural monitoring ecosystem. It handles device telemetry, user profile management, secure authentication delegation, and automated database synchronization between mobile clients and the cloud.
+
+---
+
+## ✨ Key Features
+
+- 🔐 **Delegated Clerk Authentication**: Global `ClerkAuthGuard` validating cryptographic JWT Bearer claims with `@Public()` decorator bypasses.
+- 🔄 **Dual User Synchronization**:
+  - **Real-Time Webhooks**: Cryptographic Svix signature-verified webhook handler for `user.created`, `user.updated`, and `user.deleted` events.
+  - **JIT (Just-In-Time) Auto-Provisioning**: Automatic fallback fetching from Clerk's REST API on first profile query.
+- 🛡️ **Schema-Driven Validation**: Type-safe input parsing using `Zod` and `nestjs-zod` v5.
+- 📄 **Interactive OpenAPI / Swagger**: Built-in interactive API documentation at `/api/docs` with post-processed DTO cleanup via `cleanupOpenApiDoc`.
+- 🗄️ **Serverless-Ready PostgreSQL**: Integrated with Neon Serverless Postgres via Prisma ORM 7.
+- 📚 **Comprehensive VitePress Docs**: Interactive markdown documentation with embedded Mermaid architecture diagrams.
+- 🛡️ **Rate Limiting & Security**: Throttling via `@nestjs/throttler` and unified exception envelopes with `GlobalExceptionFilter`.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| **Framework** | [NestJS 11](https://nestjs.com/) (Express platform) |
+| **Language** | [TypeScript 5.7](https://www.typescriptlang.org/) |
+| **Database & ORM** | [Prisma 7](https://www.prisma.io/) + [Neon Serverless PostgreSQL](https://neon.tech/) |
+| **Auth & Security** | [Clerk Backend SDK](https://clerk.com/) (`@clerk/backend`, `svix`) |
+| **Validation & DTOs** | [Zod 4](https://zod.dev/) + [nestjs-zod 5](https://github.com/BenLorantfy/nestjs-zod) |
+| **API Docs** | [Swagger / OpenAPI 3.0](https://swagger.io/) (`@nestjs/swagger`) |
+| **Documentation Site** | [VitePress 1.6](https://vitepress.dev/) + `vitepress-plugin-mermaid` |
+| **Package Manager** | [pnpm](https://pnpm.io/) |
+
+---
+
+## 📐 System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Clients ["📱 Clients & External Services"]
+        Mobile["Sagana Mobile (Expo / React Native)"]
+        ClerkCloud["Clerk Identity Cloud"]
+    end
+
+    subgraph Gateway ["⚡ NestJS Application Layer"]
+        Prefix["/api Global Prefix"]
+        Throttler["Throttler Rate Limiter"]
+        AuthGuard["ClerkAuthGuard (JWT Verification)"]
+        ExceptionFilter["GlobalExceptionFilter"]
+        ResponseInterceptor["TransformResponseInterceptor"]
+    end
+
+    subgraph Modules ["📦 Business & Core Modules"]
+        UsersCtrl["UsersController (/api/me)"]
+        WebhooksCtrl["WebhooksController (/api/webhooks/clerk)"]
+        HealthCtrl["AppController (/api/health)"]
+    end
+
+    subgraph DataLayer ["🗄️ Persistence"]
+        Prisma["Prisma ORM Service"]
+        NeonDB[("Neon PostgreSQL Database")]
+    end
+
+    Mobile -->|Bearer JWT| Prefix
+    ClerkCloud -->|Svix Webhook POST| Prefix
+    Prefix --> Throttler
+    Throttler --> AuthGuard
+    AuthGuard --> UsersCtrl
+    AuthGuard --> WebhooksCtrl
+    AuthGuard --> HealthCtrl
+
+    UsersCtrl --> Prisma
+    WebhooksCtrl --> Prisma
+    Prisma --> NeonDB
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ pnpm run start
+## 📁 Folder Structure
 
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```
+sagana-backend/
+├── docs/                   # 📚 VitePress Documentation Site
+│   ├── .vitepress/         # Theme & sidebar configurations
+│   ├── core-concepts/      # Security, auth lifecycle, responses
+│   ├── database/           # Prisma & PostgreSQL schema designs
+│   ├── development/        # Dev setup & deployment guides
+│   ├── modules/            # Domain module documentation
+│   └── overview/           # Architecture diagrams & blueprints
+├── prisma/                 # 🗄️ Database Schemas & Migrations
+│   ├── generated/          # Auto-generated Zod DTOs
+│   ├── schema.prisma       # Database schema definition
+│   └── prisma.config.ts    # Prisma configuration
+├── src/                    # 🚀 Application Source Code
+│   ├── core/               # Cross-cutting concerns
+│   │   ├── config/         # Environment schema validation
+│   │   ├── decorators/     # @Public(), @CurrentUserId()
+│   │   ├── exceptions/     # GlobalExceptionFilter
+│   │   ├── guards/         # ClerkAuthGuard
+│   │   ├── interceptors/   # TransformResponseInterceptor
+│   │   └── logger/         # Structured LoggerService
+│   ├── infrastructure/     # Database providers
+│   │   └── database/       # PrismaService & DatabaseModule
+│   ├── modules/            # Business feature modules
+│   │   ├── users/          # Profile retrieval & JIT provisioning
+│   │   └── webhooks/       # Svix Clerk webhook listener
+│   ├── app.controller.ts   # /api/health endpoint
+│   ├── app.module.ts       # Root module configuration
+│   └── main.ts             # Application bootstrapper
+├── .env.example            # Environment variables template
+├── package.json            # Project dependencies & scripts
+└── tsconfig.json           # TypeScript configuration
 ```
 
-## Run tests
+---
+
+## ⚡ Prerequisites
+
+- **Node.js**: `v20.x` or higher
+- **pnpm**: `v9.x` or higher (`npm install -g pnpm` or `corepack enable pnpm`)
+- **Neon PostgreSQL**: Active database instance
+- **Clerk Account**: Active application with Secret & Publishable keys
+
+---
+
+## 🔐 Environment Configuration
+
+Create a `.env` file in the root directory by copying [`.env.example`](file:///.env.example):
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+Refer to [`.env.example`](file:///.env.example) for all required environment variables:
+- **`DATABASE_URL`**: Neon PostgreSQL connection string (`?sslmode=verify-full&channel_binding=require`)
+- **`CLERK_SECRET_KEY`** & **`CLERK_PUBLISHABLE_KEY`**: Clerk API keys
+- **`CLERK_WEBHOOK_SECRET`**: Clerk Svix webhook signing secret (`whsec_...`)
+- **`PORT`** & **`API_PREFIX`**: Server port and routing prefix (`api`)
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 🚀 Quick Start
+
+### 1. Install Dependencies
+```bash
+pnpm install
+```
+
+### 2. Generate Prisma Client & Zod Schemas
+```bash
+pnpm prisma generate
+```
+
+### 3. Push Database Schema to Neon
+```bash
+npx prisma db push
+```
+
+### 4. Start Development Server
+```bash
+pnpm run start:dev
+```
+
+The API will be available at: **`http://localhost:3000/api`**
+
+---
+
+## 🗄️ Database Management
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# Push schema changes to Neon database (prototyping)
+npx prisma db push
+
+# Create and apply migrations (production)
+npx prisma migrate dev --name <migration_name>
+
+# Launch interactive Prisma Studio GUI
+npx prisma studio
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## 📑 API Documentation & Swagger
 
-Check out a few resources that may come in handy when working with NestJS:
+When the server is running, explore and test the interactive OpenAPI documentation at:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+🔗 **[http://localhost:3000/api/docs](http://localhost:3000/api/docs)**
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## 📚 Interactive Documentation Site
 
-## Stay in touch
+Run the interactive VitePress architecture guide:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+# Start local docs server (http://localhost:5173)
+pnpm run docs:dev
 
-## License
+# Build production docs
+pnpm run docs:build
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Preview production docs bundle
+pnpm run docs:preview
+```
+
+---
+
+## 🔄 Authentication & Mobile Sync
+
+The backend uses a **dual-sync model** to guarantee user records in Neon PostgreSQL:
+
+1. **Webhook Sync (`POST /api/webhooks/clerk`)**:
+   - In production or with a tunnel (e.g. `ngrok http 3000`), Clerk dispatches `user.created` / `user.updated` events directly to the webhook handler.
+2. **JIT (Just-In-Time) Auto-Provisioning**:
+   - In local development, when a newly signed-up mobile user hits `GET /api/me`, the backend automatically queries Clerk's API and creates the record in PostgreSQL on the fly if not already present.
+
+---
+
+## ☁️ Deployment (Render)
+
+This repository is pre-configured for one-click deployment on **[Render](https://render.com/)**:
+
+### Web Service Settings:
+- **Environment**: `Node`
+- **Build Command**: `pnpm install && pnpm build`
+- **Start Command**: `pnpm start:prod`
+- **Health Check Path**: `/api/health`
+
+### Required Environment Variables on Render:
+- `DATABASE_URL`
+- `CLERK_SECRET_KEY`
+- `CLERK_PUBLISHABLE_KEY`
+- `CLERK_WEBHOOK_SECRET`
+- `API_PREFIX` = `api`
+- `NODE_ENV` = `production`
+
+---
+
+## 📜 Scripts Reference
+
+| Command | Description |
+| :--- | :--- |
+| `pnpm start` | Starts NestJS server in standard mode |
+| `pnpm start:dev` | Starts NestJS server with hot-reload watch mode |
+| `pnpm start:prod` | Runs compiled production server (`dist/main.js`) |
+| `pnpm build` | Generates Prisma client & compiles TypeScript |
+| `pnpm lint` | Runs ESLint and fixes style violations |
+| `pnpm format` | Formats codebase using Prettier |
+| `pnpm test` | Executes Jest unit test suite |
+| `pnpm test:e2e` | Executes end-to-end integration tests |
+| `pnpm docs:dev` | Launches VitePress documentation dev server |
+| `pnpm docs:build` | Compiles VitePress documentation site |
+
+---
+
+## 📄 License
+
+This project is licensed under the **UNLICENSED** private commercial terms for the Sagana platform.
