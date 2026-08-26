@@ -37,6 +37,9 @@ Backend API for Sagana platform built with NestJS, Prisma, PostgreSQL, and Clerk
   - Swagger UI available at `/api/docs` (`cleanupOpenApiDoc` for Zod compatibility).
   - Global response formatting wrapped via `TransformResponseInterceptor`.
   - Global error handling via `GlobalExceptionFilter`.
+- **Git & Commits**:
+  - Conventional Commits enforced via Husky + Commitlint (`.husky/commit-msg` + `.commitlintrc.json`).
+  - Recommended VS Code extension: `vivaxy.vscode-conventional-commits`.
 
 ## Current Features & Endpoints
 
