@@ -29,8 +29,7 @@ export class UsersService {
         const fullName =
           `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
           null;
-        const contactNumber =
-          clerkUser.phoneNumbers?.[0]?.phoneNumber || null;
+        const contactNumber = clerkUser.phoneNumbers?.[0]?.phoneNumber || null;
 
         user = await this.prisma.user.upsert({
           where: { id: userId },
