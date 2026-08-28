@@ -60,6 +60,10 @@ export default withMermaid(
               text: 'Clerk Webhook Synchronization',
               link: '/modules/webhooks',
             },
+            {
+              text: 'Telemetry & IoT (HiveMQ MQTT)',
+              link: '/modules/telemetry',
+            },
           ],
         },
         {

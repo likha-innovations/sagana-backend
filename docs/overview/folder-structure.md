@@ -55,10 +55,12 @@ Shared infrastructure utilities that do not belong to any specific business doma
 ---
 
 ### 2. `src/infrastructure/` — External Adapters
-Handles direct interaction with database drivers and persistence:
+Handles direct interaction with database drivers, brokers, and persistence:
 
 * **`database/prisma.service.ts`**: Initializes PostgreSQL connection pooling with `@prisma/adapter-pg` and manages `$connect` / `$disconnect` lifecycle hooks.
 * **`database/database.module.ts`**: Exports `PrismaService` globally for dependency injection in domain modules.
+* **`mqtt/mqtt.service.ts`**: Connects securely over TLS to HiveMQ Cloud, manages automatic reconnects, topic subscriptions (`sagana/ping`, `sagana/devices/+/telemetry`), and publishes outgoing commands.
+* **`mqtt/mqtt.module.ts`**: Global module exporting `MqttService`.
 
 ---
 
@@ -67,6 +69,14 @@ Isolated feature packages containing domain logic:
 
 ```
 src/modules/
+├── telemetry/
+│   ├── dto/
+│   │   ├── publish-command.dto.ts  # Zod schema for actuator/device commands
+│   │   └── telemetry-query.dto.ts  # Query filters for telemetry readings
+│   ├── telemetry.controller.ts     # REST endpoints (/telemetry/readings, commands)
+│   ├── telemetry.service.ts        # MQTT listener & telemetry processor
+│   ├── telemetry.module.ts         # Module definition
+│   └── *.spec.ts                   # Telemetry unit tests
 ├── users/
 │   ├── dto/
 │   │   └── update-profile.dto.ts   # Zod schema & DTO for profile updates
