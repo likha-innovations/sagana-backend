@@ -7,6 +7,8 @@ import { validate } from './core/config/env.validation';
 import { LoggerModule } from './core/logger/logger.module';
 import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { MqttModule } from './infrastructure/mqtt/mqtt.module';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
 
@@ -24,6 +26,8 @@ import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
     ]),
     DatabaseModule,
     LoggerModule,
+    MqttModule,
+    TelemetryModule,
     UsersModule,
     WebhooksModule,
   ],
