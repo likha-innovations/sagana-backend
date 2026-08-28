@@ -1,0 +1,7 @@
+allowBuilds:
+  '@prisma/engines': false
+  '@scarf/scarf': false
+  esbuild: false
+  prisma: false
+  puppeteer: false
+  unrs-resolver: false
