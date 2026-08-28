@@ -110,15 +110,15 @@ model CompostingPhase {
 }
 
 model SensorReading {
-  id        String   @id @default(cuid())
-  batchId   String
+  id        String        @id @default(cuid())
+  batchId   String?
   sensorId  String
-  timestamp DateTime @default(now())
+  timestamp DateTime      @default(now())
   value     Float
   unit      String
 
-  batch  CompostBatch @relation(fields: [batchId], references: [id])
-  sensor Sensor       @relation(fields: [sensorId], references: [id])
+  batch  CompostBatch? @relation(fields: [batchId], references: [id])
+  sensor Sensor        @relation(fields: [sensorId], references: [id])
 
   @@map("sensor_readings")
 }

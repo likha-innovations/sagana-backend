@@ -33,6 +33,7 @@
     "@nestjs/swagger": "^11.4.6",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.9.1",
+    "mqtt": "^5.15.2",
     "nestjs-zod": "^5.5.0",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
