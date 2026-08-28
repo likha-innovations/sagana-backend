@@ -12,9 +12,163 @@ model User {
   email         String   @unique
   contactNumber String?
   location      String?
+  role          String   @default("user")
+  status        String   @default("active")
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  intakeRecords IntakeRecord[]
+  alerts        Alert[]
 
   @@map("users")
+}
+
+model IntakeRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  intakeDate  DateTime
+  totalWeight Float
+  status      String
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  compostBatch CompostBatch?
+
+  @@map("intake_records")
+}
+
+model CompostBatch {
+  id             String    @id @default(cuid())
+  intakeId       String    @unique
+  batchCode      String    @unique
+  startDate      DateTime
+  completionDate DateTime?
+  status         String
+  targetCnRatio  Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  intake           IntakeRecord      @relation(fields: [intakeId], references: [id])
+  compostOutput    CompostOutput?
+  mlPredictions    MlPrediction[]
+  compostingPhases CompostingPhase[]
+  sensorReadings   SensorReading[]
+  alerts           Alert[]
+
+  @@map("compost_batches")
+}
+
+model CompostOutput {
+  id             String    @id @default(cuid())
+  batchId        String    @unique
+  outputWeight   Float
+  maturityStatus String
+  productionDate DateTime
+  collectionDate DateTime?
+  status         String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("compost_outputs")
+}
+
+model MlPrediction {
+  id              String   @id @default(cuid())
+  batchId         String
+  predictedPhase  String
+  confidenceScore Float
+  isStabilized    Boolean  @default(false)
+  predictionTime  DateTime @default(now())
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("ml_predictions")
+}
+
+model CompostingPhase {
+  id        String    @id @default(cuid())
+  batchId   String
+  phaseName String
+  startTime DateTime
+  endTime   DateTime?
+  status    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("composting_phases")
+}
+
+model SensorReading {
+  id        String   @id @default(cuid())
+  batchId   String
+  sensorId  String
+  timestamp DateTime @default(now())
+  value     Float
+  unit      String
+
+  batch  CompostBatch @relation(fields: [batchId], references: [id])
+  sensor Sensor       @relation(fields: [sensorId], references: [id])
+
+  @@map("sensor_readings")
+}
+
+model Sensor {
+  id         String  @id @default(cuid())
+  deviceId   String
+  sensorType String
+  location   String?
+  unit       String
+  status     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  device   IotDevice       @relation(fields: [deviceId], references: [id])
+  readings SensorReading[]
+
+  @@map("sensors")
+}
+
+model IotDevice {
+  id              String    @id @default(cuid())
+  deviceName      String
+  deviceType      String
+  processingStage String?
+  status          String
+  lastSeen        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sensors Sensor[]
+
+  @@map("iot_devices")
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  batchId   String?
+  userId    String
+  alertType String
+  severity  String
+  message   String
+  status    String
+
+  createdAt DateTime @default(now())
+
+  batch CompostBatch? @relation(fields: [batchId], references: [id])
+  user  User          @relation(fields: [userId], references: [id])
+
+  @@map("alerts")
 }
