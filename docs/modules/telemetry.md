@@ -155,6 +155,75 @@ You can test two-way communication without physical hardware in seconds:
 
 ---
 
+---
+
+## ⚡ Socket.IO Real-Time Gateway (`/telemetry`)
+
+The backend exposes a real-time **Socket.IO WebSocket Gateway** mounted on the **`/telemetry`** namespace to stream live sensor readings directly to web and mobile apps without polling.
+
+### 1. Gateway Event Specification
+
+#### 📤 Server → Client (Broadcast Events)
+
+| Event Name | Payload Structure | Description |
+| :--- | :--- | :--- |
+| **`telemetry:reading`** | `{ deviceId, sensorId, value, unit, batchId?, timestamp }` | Broadcasted in real-time whenever a device publishes telemetry over MQTT. |
+| **`device:status`** | `{ deviceId, status, processingStage?, timestamp }` | Broadcasted when a device changes status or reports a heartbeat. |
+| **`mqtt:ping`** | `{ topic: "sagana/ping", message, timestamp }` | Broadcasted when a test ping is received from HiveMQ. |
+| **`mqtt:pong`** | `{ topic: "sagana/pong", message, timestamp }` | Broadcasted when backend publishes a pong reply. |
+
+#### 📥 Client → Server (Inbound Events)
+
+| Event Name | Request Payload | Response Event | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`ping`** | `{ text: string }` | **`pong`** | Healthcheck and connectivity test between mobile client and backend. |
+
+---
+
+### 2. Why Client → Server Exists
+
+While sensor data streams predominantly **Server → Client**, the **Client → Server** channel provides critical capabilities:
+
+1. **Downlink Hardware Control:** Real-time triggering of physical actuators (e.g. aeration fans, moisture valves, heaters) via WebSocket actions.
+2. **Room Subscriptions & Filtering:** Clients can join specific batch or bin rooms (e.g. `join:bin`) to only receive telemetry relevant to the active screen.
+3. **Liveness & Diagnostics:** Instant verification of the mobile-to-backend socket pipeline before deploying physical hardware.
+
+---
+
+### 3. Mobile / Web Client Integration (`socket.io-client`)
+
+```typescript
+import { io } from 'socket.io-client';
+
+// Connect to the /telemetry namespace
+const socket = io('http://YOUR_BACKEND_IP:3000/telemetry', {
+  transports: ['websocket'],
+  reconnectionAttempts: 5,
+});
+
+// Connection lifecycle
+socket.on('connect', () => console.log('🟢 Connected to Socket.IO'));
+socket.on('disconnect', () => console.log('🔴 Disconnected'));
+
+// 1. Listen for real-time sensor readings (from ESP32 / HiveMQ)
+socket.on('telemetry:reading', (data) => {
+  console.log('🌡️ Live Sensor Reading:', data.sensorId, data.value, data.unit);
+});
+
+// 2. Listen for device status updates
+socket.on('device:status', (data) => {
+  console.log(`Device ${data.deviceId} is now ${data.status}`);
+});
+
+// 3. Send a ping test to backend
+socket.emit('ping', { text: 'Ping from Mobile Dashboard' });
+socket.on('pong', (data) => {
+  console.log('🏓 Pong received from server:', data);
+});
+```
+
+---
+
 ## 🔌 ESP32 / Arduino Microcontroller Example
 
 Below is a complete, minimal C++ example using `PubSubClient` and `WiFiClientSecure` for ESP32:
