@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { LoggerService } from '../../core/logger/logger.service';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
+import { TelemetryGateway } from './telemetry.gateway';
 import { PublishCommandDto } from './dto/publish-command.dto';
 import { TelemetryQueryDto } from './dto/telemetry-query.dto';
 
@@ -26,6 +27,7 @@ export class TelemetryService implements OnModuleInit {
   constructor(
     private readonly mqttService: MqttService,
     private readonly logger: LoggerService,
+    private readonly telemetryGateway: TelemetryGateway,
   ) {}
 
   onModuleInit() {
@@ -36,6 +38,20 @@ export class TelemetryService implements OnModuleInit {
 
   handleIncomingMqttMessage(topic: string, payload: Buffer) {
     try {
+      const rawString = payload.toString();
+      if (!rawString) return;
+
+      // Handle Ping / Pong test topics and bridge to Socket.IO
+      if (topic === 'sagana/ping' || topic === 'sagana/pong') {
+        const eventType = topic === 'sagana/ping' ? 'ping' : 'pong';
+        this.telemetryGateway.broadcastMqttPingPong(eventType, {
+          topic,
+          message: rawString,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
       const topicParts = topic.split('/');
       // Topic pattern: sagana/devices/{deviceId}/{messageType}
       if (
@@ -48,9 +64,6 @@ export class TelemetryService implements OnModuleInit {
 
       const deviceId = topicParts[2];
       const messageType = topicParts[3]; // 'telemetry' | 'status'
-
-      const rawString = payload.toString();
-      if (!rawString) return;
 
       const parsedData = JSON.parse(rawString);
 
@@ -98,9 +111,12 @@ export class TelemetryService implements OnModuleInit {
       }
 
       this.logger.log(
-        `📡 [Telemetry Received] Device: ${deviceId} | Sensor: ${reading.sensorId} | Value: ${reading.value} ${reading.unit || ''}`,
+        `📡 [Telemetry Ingested] Device: ${deviceId} | Sensor: ${reading.sensorId} | Value: ${reading.value} ${reading.unit || ''}`,
         TelemetryService.name,
       );
+
+      // Real-time bridge to Socket.IO for mobile/web frontends
+      this.telemetryGateway.broadcastTelemetry(entry);
     }
   }
 
@@ -110,6 +126,13 @@ export class TelemetryService implements OnModuleInit {
     this.logger.log(
       `🟢 [Device Status] Device: ${deviceId} | Status: ${data.status} ${data.processingStage ? `| Stage: ${data.processingStage}` : ''}`,
       TelemetryService.name,
+    );
+
+    // Real-time bridge to Socket.IO for mobile/web frontends
+    this.telemetryGateway.broadcastDeviceStatus(
+      deviceId,
+      data.status,
+      data.processingStage,
     );
   }
 

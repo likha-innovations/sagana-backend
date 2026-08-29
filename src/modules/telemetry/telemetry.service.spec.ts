@@ -2,15 +2,23 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TelemetryService } from './telemetry.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
+import { TelemetryGateway } from './telemetry.gateway';
 
 describe('TelemetryService', () => {
   let service: TelemetryService;
   let mqttService: any;
+  let gateway: any;
 
   beforeEach(async () => {
     mqttService = {
       onMessage: jest.fn(),
       publish: jest.fn().mockResolvedValue(undefined),
+    };
+
+    gateway = {
+      broadcastMqttPingPong: jest.fn(),
+      broadcastTelemetry: jest.fn(),
+      broadcastDeviceStatus: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -23,6 +31,10 @@ describe('TelemetryService', () => {
         {
           provide: LoggerService,
           useValue: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
+        },
+        {
+          provide: TelemetryGateway,
+          useValue: gateway,
         },
       ],
     }).compile();
