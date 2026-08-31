@@ -83,38 +83,4 @@ export class TelemetryGateway
       );
     }
   }
-
-  /**
-   * Broadcast real-time sensor reading to all connected mobile/web frontends
-   */
-  broadcastTelemetry(reading: {
-    deviceId: string;
-    sensorId: string;
-    value: number;
-    unit: string;
-    batchId?: string;
-    timestamp: string;
-  }) {
-    if (this.server) {
-      this.server.emit('telemetry:reading', reading);
-    }
-  }
-
-  /**
-   * Broadcast device status update to all connected mobile/web frontends
-   */
-  broadcastDeviceStatus(
-    deviceId: string,
-    status: string,
-    processingStage?: string,
-  ) {
-    if (this.server) {
-      this.server.emit('device:status', {
-        deviceId,
-        status,
-        processingStage,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
 }

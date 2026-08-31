@@ -17,8 +17,6 @@ describe('TelemetryService', () => {
 
     gateway = {
       broadcastMqttPingPong: jest.fn(),
-      broadcastTelemetry: jest.fn(),
-      broadcastDeviceStatus: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -49,27 +47,6 @@ describe('TelemetryService', () => {
   it('should register onMessage listener on module init', () => {
     service.onModuleInit();
     expect(mqttService.onMessage).toHaveBeenCalled();
-  });
-
-  it('should process valid telemetry payload and store in memory', () => {
-    const payload = Buffer.from(
-      JSON.stringify({
-        batchId: 'batch-123',
-        sensorId: 'sensor-456',
-        value: 52.4,
-        unit: '°C',
-      }),
-    );
-
-    service.handleIncomingMqttMessage(
-      'sagana/devices/dev-01/telemetry',
-      payload,
-    );
-
-    const readings = service.getReadings({});
-    expect(readings.length).toBe(1);
-    expect(readings[0].deviceId).toBe('dev-01');
-    expect(readings[0].value).toBe(52.4);
   });
 
   it('should publish a command to a device topic', async () => {

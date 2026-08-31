@@ -42,19 +42,6 @@ describe('TelemetryGateway', () => {
     );
   });
 
-  it('should broadcast telemetry to all clients', () => {
-    const reading = {
-      deviceId: 'dev-01',
-      sensorId: 'temp-1',
-      value: 55.4,
-      unit: '°C',
-      timestamp: new Date().toISOString(),
-    };
-
-    gateway.broadcastTelemetry(reading);
-    expect(mockServer.emit).toHaveBeenCalledWith('telemetry:reading', reading);
-  });
-
   it('should broadcast mqtt ping/pong events', () => {
     const eventData = {
       topic: 'sagana/ping',

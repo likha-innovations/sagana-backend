@@ -8,8 +8,6 @@ describe('TelemetryController', () => {
 
   beforeEach(async () => {
     service = {
-      getReadings: jest.fn().mockReturnValue([]),
-      getLatestByDevice: jest.fn().mockReturnValue([]),
       sendCommandToDevice: jest.fn().mockResolvedValue({ success: true }),
     };
 
@@ -28,18 +26,6 @@ describe('TelemetryController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
-  });
-
-  it('should get readings', () => {
-    const result = controller.getReadings({ limit: 10 });
-    expect(service.getReadings).toHaveBeenCalledWith({ limit: 10 });
-    expect(result).toEqual([]);
-  });
-
-  it('should get latest device readings', () => {
-    const result = controller.getLatestByDevice('dev-01');
-    expect(service.getLatestByDevice).toHaveBeenCalledWith('dev-01');
-    expect(result).toEqual([]);
   });
 
   it('should send command to device', async () => {
