@@ -96,12 +96,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   private subscribeDefaultTopics() {
-    const topics = [
-      'sagana/ping',
-      'sagana/pong',
-      'sagana/devices/+/telemetry',
-      'sagana/devices/+/status',
-    ];
+    const topics = ['sagana/ping', 'sagana/pong'];
 
     for (const topic of topics) {
       this.subscribe(topic);
