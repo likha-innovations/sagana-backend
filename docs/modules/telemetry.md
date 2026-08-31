@@ -1,6 +1,6 @@
 # Telemetry & MQTT Integration (HiveMQ)
 
-The **Telemetry & MQTT Module** manages real-time IoT device communication, sensor data ingestion, and downlink device control through a managed **HiveMQ Cloud** MQTT broker.
+The **Telemetry & MQTT Module** manages real-time IoT device communication, protocol diagnostics, and downlink device control through a managed **HiveMQ Cloud** MQTT broker.
 
 ---
 
@@ -9,34 +9,26 @@ The **Telemetry & MQTT Module** manages real-time IoT device communication, sens
 ```mermaid
 flowchart TD
     subgraph Hardware ["🔌 Physical IoT Devices"]
-        ESP["ESP32 / Microcontroller<br/>(DHT22, Soil Sensors)"]
+        ESP["ESP32 / Microcontroller"]
         Actuators["Actuators / Relays<br/>(Fans, Aeration, Valves)"]
     end
 
     subgraph HiveMQ ["☁️ HiveMQ Cloud Broker (TLS 8883)"]
-        TeleTopic["Topic: sagana/devices/+/telemetry"]
-        StatusTopic["Topic: sagana/devices/+/status"]
-        CmdTopic["Topic: sagana/devices/+/commands"]
         PingTopic["Topic: sagana/ping & sagana/pong"]
+        CmdTopic["Topic: sagana/devices/+/commands"]
     end
 
     subgraph Backend ["🖥️ NestJS Backend"]
         MqttSvc["MqttService<br/>(Infrastructure)"]
-        TelemSvc["TelemetryService<br/>(Domain Logic & In-Memory Store)"]
+        TelemSvc["TelemetryService<br/>(Domain Logic)"]
+        TelemGateway["TelemetryGateway<br/>(Socket.IO /telemetry)"]
         TelemCtrl["TelemetryController<br/>(REST API / Swagger)"]
     end
 
     subgraph Clients ["📱 Web & Mobile Clients"]
-        Dashboard["Admin / User Dashboard"]
+        Dashboard["Mobile / Web App"]
     end
 
-    ESP -->|Publish Sensor JSON| TeleTopic
-    ESP -->|Publish Heartbeat| StatusTopic
-    TeleTopic --> MqttSvc
-    StatusTopic --> MqttSvc
-    MqttSvc --> TelemSvc
-
-    Dashboard -->|GET /api/telemetry/readings| TelemCtrl
     Dashboard -->|POST /api/telemetry/devices/:id/command| TelemCtrl
     TelemCtrl --> TelemSvc
     TelemSvc -->|Publish Command| MqttSvc
@@ -44,6 +36,8 @@ flowchart TD
     CmdTopic -->|Receive Command| Actuators
 
     PingTopic <-->|Ping-Pong Echo| MqttSvc
+    MqttSvc -->|Bridge MQTT Events| TelemGateway
+    TelemGateway <-->|WebSocket Ping/Pong & MQTT Bridge| Dashboard
 ```
 
 ---
@@ -54,9 +48,7 @@ flowchart TD
 | :--- | :--- | :---: | :--- |
 | **`sagana/ping`** | Client → Broker → Backend | `1` | Test connectivity. Backend receives ping and replies to `sagana/pong`. |
 | **`sagana/pong`** | Backend → Broker → Client | `1` | Response echo containing payload and server timestamp. |
-| **`sagana/devices/{deviceId}/telemetry`** | ESP32 → Backend | `1` | Sensor readings stream (temperature, moisture, humidity). |
-| **`sagana/devices/{deviceId}/status`** | ESP32 → Backend | `1` | Device heartbeat, operational status (`online`, `idle`, `error`). |
-| **`sagana/devices/{deviceId}/commands`** | Backend → ESP32 | `1` | Downlink control actions (e.g., turn on fan, recalibrate). |
+| **`sagana/devices/{deviceId}/commands`** | Backend → ESP32 | `1` | Downlink control actions (e.g., toggle fan, recalibrate). |
 
 ---
 
@@ -73,54 +65,8 @@ flowchart TD
 | **`2`** | **Exactly once**<br/>*(Handshake)* | 4-step confirmation handshake (`PUBREC`, `PUBREL`, `PUBCOMP`). | ❌ Never | ❌ Never | Financial transactions or irreversible hardware triggers. |
 
 ::: tip 💡 Why Sagana Uses QoS 1
-Sagana Backend defaults to **QoS 1** across all telemetry and command topics. This guarantees that critical compost telemetry (temperature spikes, aeration states, and moisture thresholds) is never lost during temporary WiFi disconnects or network blips.
+Sagana Backend defaults to **QoS 1** across all MQTT topics. This guarantees that critical hardware commands and status pings are never lost during temporary WiFi disconnects or network blips.
 :::
-
----
-
-## 📦 Payload Formats
-
-### 1. Sensor Telemetry Payload
-Published by the device to `sagana/devices/<DEVICE_ID>/telemetry`:
-
-```json
-{
-  "sensorId": "sensor-temp-01",
-  "value": 54.8,
-  "unit": "°C",
-  "batchId": "cm123456789",
-  "timestamp": "2026-08-28T14:30:00.000Z"
-}
-```
-
-* `sensorId` *(string, required)*: Unique identifier of the physical sensor.
-* `value` *(number, required)*: Measured float value.
-* `unit` *(string, optional)*: Measurement unit (`°C`, `%`, `pH`, `ppm`).
-* `batchId` *(string, optional)*: Associated compost batch ID (if assigned).
-* `timestamp` *(ISO date string, optional)*: Sensor measurement timestamp.
-
-### 2. Device Status Payload
-Published by the device to `sagana/devices/<DEVICE_ID>/status`:
-
-```json
-{
-  "status": "online",
-  "processingStage": "thermophilic"
-}
-```
-
-### 3. Downlink Command Payload
-Published by the backend to `sagana/devices/<DEVICE_ID>/commands`:
-
-```json
-{
-  "action": "toggle_aeration_fan",
-  "payload": {
-    "speed": 80,
-    "durationMinutes": 15
-  }
-}
-```
 
 ---
 
@@ -130,9 +76,29 @@ All telemetry endpoints are documented with Swagger and grouped under **`Telemet
 
 | Method | Endpoint | Protected | Description |
 | :--- | :--- | :---: | :--- |
-| **`GET`** | `/api/telemetry/readings` | 🔒 Yes | Query historical/buffered telemetry with optional filters (`batchId`, `sensorId`, `limit`). |
-| **`GET`** | `/api/telemetry/devices/:deviceId/latest` | 🔒 Yes | Get the latest sensor values for a specific device. |
 | **`POST`** | `/api/telemetry/devices/:deviceId/command` | 🔒 Yes | Dispatch an MQTT action down to a physical hardware device. |
+
+---
+
+## ⚡ Socket.IO Real-Time Gateway (`/telemetry`)
+
+The backend exposes a real-time **Socket.IO WebSocket Gateway** mounted on the **`/telemetry`** namespace to stream diagnostic events and test latency directly with web and mobile apps.
+
+### 1. Gateway Event Specification
+
+#### 📤 Server → Client (Broadcast Events)
+
+| Event Name | Payload Structure | Description |
+| :--- | :--- | :--- |
+| **`pong`** | `{ status: 'ok', source: 'socket.io-server', received, timestamp }` | Sent directly in response to mobile `ping`. |
+| **`mqtt:ping`** | `{ topic: "sagana/ping", message, timestamp }` | Broadcasted when a test ping is received from HiveMQ. |
+| **`mqtt:pong`** | `{ topic: "sagana/pong", message, timestamp }` | Broadcasted when backend publishes a pong reply. |
+
+#### 📥 Client → Server (Inbound Events)
+
+| Event Name | Request Payload | Response Event | Purpose |
+| :--- | :--- | :--- | :--- |
+| **`ping`** | `{ text: string }` | **`pong`** | Healthcheck and latency measurement between mobile client and backend. |
 
 ---
 
@@ -146,137 +112,4 @@ You can test two-way communication without physical hardware in seconds:
    * Add `sagana/pong` (to see ping-pong replies)
    * Add `sagana/devices/+/commands` (to see outgoing commands)
 4. Under **Send Message**:
-   * **Ping-Pong Test:** Publish any string to `sagana/ping`. You will immediately receive `{ "status": "ok", "received": "...", "timestamp": "..." }` on `sagana/pong`.
-   * **Telemetry Test:** Publish JSON to `sagana/devices/esp32_01/telemetry`:
-     ```json
-     { "sensorId": "temp_01", "value": 52.4, "unit": "°C" }
-     ```
-     Backend logs will confirm reception and populate the telemetry query endpoint.
-
----
-
----
-
-## ⚡ Socket.IO Real-Time Gateway (`/telemetry`)
-
-The backend exposes a real-time **Socket.IO WebSocket Gateway** mounted on the **`/telemetry`** namespace to stream live sensor readings directly to web and mobile apps without polling.
-
-### 1. Gateway Event Specification
-
-#### 📤 Server → Client (Broadcast Events)
-
-| Event Name | Payload Structure | Description |
-| :--- | :--- | :--- |
-| **`telemetry:reading`** | `{ deviceId, sensorId, value, unit, batchId?, timestamp }` | Broadcasted in real-time whenever a device publishes telemetry over MQTT. |
-| **`device:status`** | `{ deviceId, status, processingStage?, timestamp }` | Broadcasted when a device changes status or reports a heartbeat. |
-| **`mqtt:ping`** | `{ topic: "sagana/ping", message, timestamp }` | Broadcasted when a test ping is received from HiveMQ. |
-| **`mqtt:pong`** | `{ topic: "sagana/pong", message, timestamp }` | Broadcasted when backend publishes a pong reply. |
-
-#### 📥 Client → Server (Inbound Events)
-
-| Event Name | Request Payload | Response Event | Purpose |
-| :--- | :--- | :--- | :--- |
-| **`ping`** | `{ text: string }` | **`pong`** | Healthcheck and connectivity test between mobile client and backend. |
-
----
-
-### 2. Why Client → Server Exists
-
-While sensor data streams predominantly **Server → Client**, the **Client → Server** channel provides critical capabilities:
-
-1. **Downlink Hardware Control:** Real-time triggering of physical actuators (e.g. aeration fans, moisture valves, heaters) via WebSocket actions.
-2. **Room Subscriptions & Filtering:** Clients can join specific batch or bin rooms (e.g. `join:bin`) to only receive telemetry relevant to the active screen.
-3. **Liveness & Diagnostics:** Instant verification of the mobile-to-backend socket pipeline before deploying physical hardware.
-
----
-
-### 3. Mobile / Web Client Integration (`socket.io-client`)
-
-```typescript
-import { io } from 'socket.io-client';
-
-// Connect to the /telemetry namespace
-const socket = io('http://YOUR_BACKEND_IP:3000/telemetry', {
-  transports: ['websocket'],
-  reconnectionAttempts: 5,
-});
-
-// Connection lifecycle
-socket.on('connect', () => console.log('🟢 Connected to Socket.IO'));
-socket.on('disconnect', () => console.log('🔴 Disconnected'));
-
-// 1. Listen for real-time sensor readings (from ESP32 / HiveMQ)
-socket.on('telemetry:reading', (data) => {
-  console.log('🌡️ Live Sensor Reading:', data.sensorId, data.value, data.unit);
-});
-
-// 2. Listen for device status updates
-socket.on('device:status', (data) => {
-  console.log(`Device ${data.deviceId} is now ${data.status}`);
-});
-
-// 3. Send a ping test to backend
-socket.emit('ping', { text: 'Ping from Mobile Dashboard' });
-socket.on('pong', (data) => {
-  console.log('🏓 Pong received from server:', data);
-});
-```
-
----
-
-## 🔌 ESP32 / Arduino Microcontroller Example
-
-Below is a complete, minimal C++ example using `PubSubClient` and `WiFiClientSecure` for ESP32:
-
-```cpp
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <PubSubClient.h>
-
-const char* ssid        = "YOUR_WIFI_SSID";
-const char* password    = "YOUR_WIFI_PASSWORD";
-
-const char* mqtt_server = "72ce69a1924d47728757a99c70a2ba26.s1.eu.hivemq.cloud";
-const int   mqtt_port   = 8883;
-const char* mqtt_user   = "likha";
-const char* mqtt_pass   = "likha2026";
-const char* device_id   = "esp32_bin_01";
-
-WiFiClientSecure espClient;
-PubSubClient client(espClient);
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  String message;
-  for (int i = 0; i < length; i++) message += (char)payload[i];
-  Serial.printf("Command received on [%s]: %s\n", topic, message.c_str());
-  // Process hardware control actions (e.g. GPIO relays)
-}
-
-void setup() {
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) delay(500);
-
-  espClient.setInsecure(); // Enable TLS connection
-  client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(callback);
-}
-
-void loop() {
-  if (!client.connected()) {
-    if (client.connect(device_id, mqtt_user, mqtt_pass)) {
-      client.subscribe("sagana/devices/esp32_bin_01/commands");
-    }
-  }
-  client.loop();
-
-  // Stream sensor data every 10 seconds
-  static unsigned long lastTime = 0;
-  if (millis() - lastTime > 10000) {
-    lastTime = millis();
-    float temperature = 55.4; // Replace with sensor read
-    String payload = "{\"sensorId\":\"temp_01\",\"value\":" + String(temperature) + ",\"unit\":\"°C\"}";
-    client.publish("sagana/devices/esp32_bin_01/telemetry", payload.c_str());
-  }
-}
-```
+   * **Ping-Pong Test:** Publish any string to `sagana/ping`. You will immediately receive `{ "status": "ok", "received": "...", "timestamp": "..." }` on `sagana/pong` and over Socket.IO on the mobile dashboard.
