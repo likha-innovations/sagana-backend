@@ -58,10 +58,13 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
   - `POST /webhooks/clerk` — Public endpoint verifying Svix signatures to handle Clerk events (`user.created`, `user.updated`, `user.deleted`) and sync with PostgreSQL.
 - **Telemetry & IoT (`/telemetry`)**:
   - `POST /telemetry/devices/:deviceId/command` — Dispatches MQTT control command to `sagana/devices/:deviceId/commands`.
-  - Socket.IO `/telemetry` Namespace — Handles bidirectional client `ping`/`pong` and broadcasts live hardware events (`mqtt:ping`, `mqtt:pong`).
+  - **Socket.IO `/telemetry` Namespace & MQTT Bridge**:
+    - **Inbound Telemetry**: Subscribes to HiveMQ Cloud topic `sagana/stream` and broadcasts live sensor readings to mobile clients via event `'telemetry'`.
+    - **Outbound Commands**: Listens to Socket.IO event `'command'` from clients and dispatches it directly to HiveMQ Cloud topic `sagana/commands`.
 
 ## Decisions & Dead-ends
 
 - **Manual DTOs over `prisma-zod-generator`**: `prisma-zod-generator` was removed to keep the public HTTP API schema decoupled from internal database models and avoid redundant build generation.
 - **Zod v4**: Project imports from `'zod/v4'` for strict schema validation.
-- **MQTT to WebSocket Bridge Pattern**: Backend mediates between hardware MQTT brokers and client applications over namespaced Socket.IO connections, avoiding exposing raw MQTT broker credentials directly to mobile/web clients.
+- **MQTT to WebSocket Bridge Pattern**: Backend mediates between hardware MQTT brokers (HiveMQ Cloud TLS 8883) and client applications over namespaced Socket.IO connections (`/telemetry`), avoiding exposing raw MQTT broker credentials directly to mobile/web clients.
+- **Stream & Command Baseline**: Standardized on topic `sagana/stream` (uplink ➔ Socket.IO `'telemetry'`) and `sagana/commands` (downlink ➔ Socket.IO `'command'`), avoiding Socket.IO v4 reserved keywords (`ping`/`pong`) and establishing clean, symmetric IoT communication.

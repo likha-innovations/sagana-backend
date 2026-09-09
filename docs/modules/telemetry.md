@@ -1,6 +1,6 @@
 # Telemetry & MQTT Integration (HiveMQ)
 
-The **Telemetry & MQTT Module** manages real-time IoT device communication, protocol diagnostics, and downlink device control through a managed **HiveMQ Cloud** MQTT broker.
+The **Telemetry & MQTT Module** manages real-time IoT device communication, live telemetry streaming, and downlink device actuation through a managed **HiveMQ Cloud** MQTT broker.
 
 ---
 
@@ -8,14 +8,14 @@ The **Telemetry & MQTT Module** manages real-time IoT device communication, prot
 
 ```mermaid
 flowchart TD
-    subgraph Hardware ["🔌 Physical IoT Devices"]
+    subgraph Hardware ["🔌 Physical IoT Devices / Firmware"]
         ESP["ESP32 / Microcontroller"]
-        Actuators["Actuators / Relays<br/>(Fans, Aeration, Valves)"]
+        Actuators["Actuators / Relays<br/>(Fans, Pumps, Valves)"]
     end
 
     subgraph HiveMQ ["☁️ HiveMQ Cloud Broker (TLS 8883)"]
-        PingTopic["Topic: sagana/ping & sagana/pong"]
-        CmdTopic["Topic: sagana/devices/+/commands"]
+        StreamTopic["Inbound Topic: sagana/stream"]
+        CmdTopic["Outbound Topic: sagana/commands"]
     end
 
     subgraph Backend ["🖥️ NestJS Backend"]
@@ -25,19 +25,20 @@ flowchart TD
         TelemCtrl["TelemetryController<br/>(REST API / Swagger)"]
     end
 
-    subgraph Clients ["📱 Web & Mobile Clients"]
-        Dashboard["Mobile / Web App"]
+    subgraph Clients ["📱 Mobile & Web Clients"]
+        Dashboard["Mobile Dashboard"]
     end
 
-    Dashboard -->|POST /api/telemetry/devices/:id/command| TelemCtrl
-    TelemCtrl --> TelemSvc
-    TelemSvc -->|Publish Command| MqttSvc
+    ESP -->|Publish Sensor Readings| StreamTopic
+    StreamTopic -->|Deliver Message| MqttSvc
+    MqttSvc --> TelemSvc
+    TelemSvc -->|broadcastTelemetry| TelemGateway
+    TelemGateway -->|Socket.IO emit 'telemetry'| Dashboard
+
+    Dashboard -->|Socket.IO emit 'command'| TelemGateway
+    TelemGateway -->|Publish Command| MqttSvc
     MqttSvc --> CmdTopic
     CmdTopic -->|Receive Command| Actuators
-
-    PingTopic <-->|Ping-Pong Echo| MqttSvc
-    MqttSvc -->|Bridge MQTT Events| TelemGateway
-    TelemGateway <-->|WebSocket Ping/Pong & MQTT Bridge| Dashboard
 ```
 
 ---
@@ -46,9 +47,8 @@ flowchart TD
 
 | Topic Pattern | Direction | QoS | Purpose |
 | :--- | :--- | :---: | :--- |
-| **`sagana/ping`** | Client → Broker → Backend | `1` | Test connectivity. Backend receives ping and replies to `sagana/pong`. |
-| **`sagana/pong`** | Backend → Broker → Client | `1` | Response echo containing payload and server timestamp. |
-| **`sagana/devices/{deviceId}/commands`** | Backend → ESP32 | `1` | Downlink control actions (e.g., toggle fan, recalibrate). |
+| **`sagana/stream`** | Firmware → Broker → Backend | `1` | Live telemetry stream (sensor readings, temperature, humidity, water level). |
+| **`sagana/commands`** | Backend → Broker → Firmware | `1` | Downlink control triggers (e.g. `RELAY_ON`, `{"state": 1}`). |
 
 ---
 
@@ -65,7 +65,7 @@ flowchart TD
 | **`2`** | **Exactly once**<br/>*(Handshake)* | 4-step confirmation handshake (`PUBREC`, `PUBREL`, `PUBCOMP`). | ❌ Never | ❌ Never | Financial transactions or irreversible hardware triggers. |
 
 ::: tip 💡 Why Sagana Uses QoS 1
-Sagana Backend defaults to **QoS 1** across all MQTT topics. This guarantees that critical hardware commands and status pings are never lost during temporary WiFi disconnects or network blips.
+Sagana Backend defaults to **QoS 1** across all MQTT topics. This guarantees that critical hardware commands and sensor readings are never lost during temporary WiFi disconnects or network blips.
 :::
 
 ---
@@ -82,7 +82,7 @@ All telemetry endpoints are documented with Swagger and grouped under **`Telemet
 
 ## ⚡ Socket.IO Real-Time Gateway (`/telemetry`)
 
-The backend exposes a real-time **Socket.IO WebSocket Gateway** mounted on the **`/telemetry`** namespace to stream diagnostic events and test latency directly with web and mobile apps.
+The backend exposes a real-time **Socket.IO WebSocket Gateway** mounted on the **`/telemetry`** namespace to stream live telemetry and receive commands from mobile and web applications.
 
 ### 1. Gateway Event Specification
 
@@ -90,15 +90,13 @@ The backend exposes a real-time **Socket.IO WebSocket Gateway** mounted on the *
 
 | Event Name | Payload Structure | Description |
 | :--- | :--- | :--- |
-| **`pong`** | `{ status: 'ok', source: 'socket.io-server', received, timestamp }` | Sent directly in response to mobile `ping`. |
-| **`mqtt:ping`** | `{ topic: "sagana/ping", message, timestamp }` | Broadcasted when a test ping is received from HiveMQ. |
-| **`mqtt:pong`** | `{ topic: "sagana/pong", message, timestamp }` | Broadcasted when backend publishes a pong reply. |
+| **`telemetry`** | `TelemetryData \| object \| string` | Real-time payload received from HiveMQ topic `sagana/stream`. |
 
 #### 📥 Client → Server (Inbound Events)
 
-| Event Name | Request Payload | Response Event | Purpose |
-| :--- | :--- | :--- | :--- |
-| **`ping`** | `{ text: string }` | **`pong`** | Healthcheck and latency measurement between mobile client and backend. |
+| Event Name | Request Payload | Action |
+| :--- | :--- | :--- |
+| **`command`** | `string \| object` | Dispatches custom control message directly to HiveMQ topic `sagana/commands`. |
 
 ---
 
@@ -109,7 +107,11 @@ You can test two-way communication without physical hardware in seconds:
 1. Open your **HiveMQ Cloud Console** → Go to your **Cluster** → Open the **Web Client** tab.
 2. Connect with your credentials (`likha` / `likha2026`).
 3. Under **Topic Subscriptions**:
-   * Add `sagana/pong` (to see ping-pong replies)
-   * Add `sagana/devices/+/commands` (to see outgoing commands)
+   * Add `sagana/commands` (to observe incoming commands from the mobile app)
 4. Under **Send Message**:
-   * **Ping-Pong Test:** Publish any string to `sagana/ping`. You will immediately receive `{ "status": "ok", "received": "...", "timestamp": "..." }` on `sagana/pong` and over Socket.IO on the mobile dashboard.
+   * Topic: `sagana/stream`
+   * Payload:
+     ```json
+     { "temperature": 28.5, "humidity": 65 }
+     ```
+   * Click **Publish**. The mobile dashboard immediately renders the live readings!
