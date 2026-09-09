@@ -10,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
 
 @WebSocketGateway({
   cors: {
@@ -24,6 +25,8 @@ export class TelemetryGateway
   server: Server;
 
   private readonly logger = new Logger(TelemetryGateway.name);
+
+  constructor(private readonly mqttService: MqttService) {}
 
   afterInit() {
     this.logger.log(
@@ -47,40 +50,35 @@ export class TelemetryGateway
     return this.server?.sockets?.sockets?.size || 0;
   }
 
-  /**
-   * Socket.IO Ping-Pong handler
-   * When mobile/web emits 'ping', replies with 'pong'
-   */
-  @SubscribeMessage('ping')
-  handlePing(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
-    const payload = typeof data === 'string' ? data : JSON.stringify(data);
-    this.logger.log(
-      `🏓 [Socket.IO] Received 'ping' from client ${client.id}: ${payload}`,
-    );
-
-    const response = {
-      status: 'ok',
-      source: 'socket.io-server',
-      received: data,
-      timestamp: new Date().toISOString(),
-    };
-
-    client.emit('pong', response);
-    return response;
+  // Emits real-time telemetry stream received from HiveMQ to all mobile clients
+  broadcastTelemetry(data: unknown) {
+    if (!this.server) return;
+    const payloadStr =
+      typeof data === 'object' && data !== null
+        ? JSON.stringify(data)
+        : String(data);
+    this.server.emit('telemetry', data);
+    this.logger.log(`📤 [Socket.IO Emitted] Event 'telemetry': ${payloadStr}`);
   }
 
-  /**
-   * Broadcast MQTT Ping/Pong event to all connected mobile/web frontends
-   */
-  broadcastMqttPingPong(
-    type: 'ping' | 'pong',
-    data: { topic: string; message: string; timestamp: string },
+  // Receives custom command from mobile client and dispatches it directly to HiveMQ topic
+  @SubscribeMessage('command')
+  async handleCommand(
+    @MessageBody() data: unknown,
+    @ConnectedSocket() client: Socket,
   ) {
-    if (this.server) {
-      this.server.emit(`mqtt:${type}`, data);
-      this.logger.log(
-        `📢 [Socket.IO Broadcast] Emitted 'mqtt:${type}' to all mobile clients`,
-      );
-    }
+    const payloadStr =
+      typeof data === 'object' && data !== null
+        ? JSON.stringify(data)
+        : String(data);
+    this.logger.log(
+      `📥 [Socket.IO Received] Event 'command' from client ${client.id}: ${payloadStr}`,
+    );
+    await this.mqttService.publish('sagana/commands', data as object);
+    return {
+      status: 'published',
+      topic: 'sagana/commands',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

@@ -23,14 +23,18 @@ export class TelemetryService implements OnModuleInit {
       const rawString = payload.toString();
       if (!rawString) return;
 
-      // Handle Ping / Pong test topics and bridge to Socket.IO
-      if (topic === 'sagana/ping' || topic === 'sagana/pong') {
-        const eventType = topic === 'sagana/ping' ? 'ping' : 'pong';
-        this.telemetryGateway.broadcastMqttPingPong(eventType, {
-          topic,
-          message: rawString,
-          timestamp: new Date().toISOString(),
-        });
+      let parsedData: unknown = rawString;
+      try {
+        parsedData = JSON.parse(rawString);
+      } catch {
+        // Fallback to raw string if not JSON
+      }
+
+      if (topic === 'sagana/stream') {
+        this.logger.log(
+          `📥 [Telemetry Ingest] '${topic}' forwarded to Gateway: ${rawString}`,
+        );
+        this.telemetryGateway.broadcastTelemetry(parsedData);
       }
     } catch (err) {
       this.logger.error(

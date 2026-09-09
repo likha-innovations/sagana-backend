@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TelemetryGateway } from './telemetry.gateway';
+import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
 
 describe('TelemetryGateway', () => {
   let gateway: TelemetryGateway;
   let mockServer: any;
+  let mockMqttService: any;
 
   beforeEach(async () => {
     mockServer = {
@@ -11,8 +13,18 @@ describe('TelemetryGateway', () => {
       sockets: new Map(),
     };
 
+    mockMqttService = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TelemetryGateway],
+      providers: [
+        TelemetryGateway,
+        {
+          provide: MqttService,
+          useValue: mockMqttService,
+        },
+      ],
     }).compile();
 
     gateway = module.get<TelemetryGateway>(TelemetryGateway);
@@ -23,33 +35,26 @@ describe('TelemetryGateway', () => {
     expect(gateway).toBeDefined();
   });
 
-  it('should handle ping and reply with pong', () => {
-    const mockSocket = {
-      id: 'test-socket-1',
-      emit: jest.fn(),
-    } as any;
+  it('should broadcast telemetry data to all connected clients', () => {
+    const testData = { temperature: 28.5, humidity: 65 };
+    gateway.broadcastTelemetry(testData);
 
-    const response = gateway.handlePing(
-      { text: 'ping from client' },
-      mockSocket,
-    );
-
-    expect(response.status).toBe('ok');
-    expect(response.received).toEqual({ text: 'ping from client' });
-    expect(mockSocket.emit).toHaveBeenCalledWith(
-      'pong',
-      expect.objectContaining({ status: 'ok' }),
-    );
+    expect(mockServer.emit).toHaveBeenCalledWith('telemetry', testData);
   });
 
-  it('should broadcast mqtt ping/pong events', () => {
-    const eventData = {
-      topic: 'sagana/ping',
-      message: 'test ping',
-      timestamp: new Date().toISOString(),
-    };
+  it('should handle command from client and publish to sagana/commands topic', async () => {
+    const mockSocket = {
+      id: 'test-socket-1',
+    } as any;
 
-    gateway.broadcastMqttPingPong('ping', eventData);
-    expect(mockServer.emit).toHaveBeenCalledWith('mqtt:ping', eventData);
+    const commandPayload = { action: 'RELAY_ON' };
+    const response = await gateway.handleCommand(commandPayload, mockSocket);
+
+    expect(mockMqttService.publish).toHaveBeenCalledWith(
+      'sagana/commands',
+      commandPayload,
+    );
+    expect(response.status).toBe('published');
+    expect(response.topic).toBe('sagana/commands');
   });
 });

@@ -70,18 +70,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.client.on('message', (topic, payload) => {
-      // Direct ping-pong test listener
-      if (topic === 'sagana/ping') {
-        const messageStr = payload.toString();
-        this.logger.log(
-          `Test MQTT message received on 'sagana/ping': ${messageStr}`,
-        );
-        void this.publish('sagana/pong', {
-          status: 'ok',
-          received: messageStr,
-          timestamp: new Date().toISOString(),
-        });
-      }
+      const messageStr = payload.toString();
+      this.logger.log(`📥 [MQTT Received] Topic '${topic}': ${messageStr}`);
 
       for (const handler of this.messageHandlers) {
         try {
@@ -96,11 +86,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   private subscribeDefaultTopics() {
-    const topics = ['sagana/ping', 'sagana/pong'];
-
-    for (const topic of topics) {
-      this.subscribe(topic);
-    }
+    this.subscribe('sagana/stream');
   }
 
   subscribe(topic: string, qos: mqtt.IClientSubscribeOptions['qos'] = 1) {
@@ -142,6 +128,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           this.logger.error(`Failed to publish to ${topic}: ${err.message}`);
           return reject(err);
         }
+        this.logger.log(`📤 [MQTT Published] Topic '${topic}': ${payload}`);
         resolve();
       });
     });
