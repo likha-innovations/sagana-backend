@@ -6,7 +6,11 @@ export class AppController {
   @Public()
   @Get()
   getRoot() {
-    return { status: 'ok', message: 'Sagana Backend API is running', uptime: process.uptime() };
+    return {
+      status: 'ok',
+      message: 'Sagana Backend API is running',
+      uptime: process.uptime(),
+    };
   }
 
   @Public()
