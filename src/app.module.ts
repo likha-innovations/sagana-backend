@@ -16,6 +16,7 @@ import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env.development', '.env'],
       validate,
     }),
     ThrottlerModule.forRoot([

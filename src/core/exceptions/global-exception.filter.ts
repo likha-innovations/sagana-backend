@@ -29,6 +29,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ? exResponse
           : (exResponse as any).message || exception.message;
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      this.logger.error(
+        `Prisma query error [${exception.code}]: ${exception.message}`,
+      );
       switch (exception.code) {
         case 'P2002':
           status = HttpStatus.CONFLICT;
@@ -40,7 +43,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           break;
         default:
           status = HttpStatus.BAD_REQUEST;
-          message = 'Database request error';
+          message = `Database request error (${exception.code})`;
       }
     } else {
       const err = exception as Error;
