@@ -83,12 +83,19 @@ export class WebhooksController {
       const email = evt.data.email_addresses?.[0]?.email_address || '';
       const fullName =
         `${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim();
-      const contactNumber = evt.data.phone_numbers?.[0]?.phone_number || null;
+      const publicMetadata = evt.data.public_metadata || {};
+      const unsafeMetadata = evt.data.unsafe_metadata || {};
+      
+      const birthday = publicMetadata.birthday || unsafeMetadata.birthday || null;
+      const barangayId = publicMetadata.barangay || unsafeMetadata.barangay || null;
+      
+      const role = publicMetadata.role || unsafeMetadata.role || 'operator';
+      const status = publicMetadata.status || unsafeMetadata.status || 'active';
 
       await this.prisma.user.upsert({
         where: { id },
-        update: { fullName, email, contactNumber },
-        create: { id, fullName, email, contactNumber, location: null },
+        update: { fullName, email, birthday, barangayId, role, status },
+        create: { id, fullName, email, birthday, barangayId, role, status },
       });
       this.logger.log(
         `User ${id} successfully synced to Neon database`,

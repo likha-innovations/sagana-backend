@@ -11,6 +11,7 @@ import { MqttModule } from './infrastructure/mqtt/mqtt.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
+import { BarangaysModule } from './modules/barangays/barangays.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
     TelemetryModule,
     UsersModule,
     WebhooksModule,
+    BarangaysModule,
   ],
   controllers: [AppController],
   providers: [

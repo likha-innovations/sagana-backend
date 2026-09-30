@@ -9,11 +9,14 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
-  ) {}
+  ) { }
 
   async getProfile(userId: string) {
     this.logger.log(`Fetching profile for user ${userId}`, UsersService.name);
-    let user = await this.prisma.user.findUnique({ where: { id: userId } });
+    let user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      include: { barangay: true }
+    });
 
     if (!user) {
       this.logger.log(
@@ -29,18 +32,28 @@ export class UsersService {
         const fullName =
           `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
           null;
-        const contactNumber = clerkUser.phoneNumbers?.[0]?.phoneNumber || null;
+        const publicMetadata = clerkUser.publicMetadata || {};
+        const unsafeMetadata = clerkUser.unsafeMetadata || {};
+
+        const birthday = (publicMetadata.birthday || unsafeMetadata.birthday) as string | null;
+        const barangayId = (publicMetadata.barangay || unsafeMetadata.barangay) as string | null;
+
+        const role = (publicMetadata.role || unsafeMetadata.role || 'operator') as string;
+        const status = (publicMetadata.status || unsafeMetadata.status || 'active') as string;
 
         user = await this.prisma.user.upsert({
           where: { id: userId },
-          update: { fullName, email, contactNumber },
+          update: { fullName, email, birthday, barangayId, role, status },
           create: {
             id: userId,
             fullName,
             email,
-            contactNumber,
-            location: null,
+            birthday,
+            barangayId,
+            role,
+            status,
           },
+          include: { barangay: true },
         });
       } catch (err) {
         this.logger.warn(
@@ -56,7 +69,7 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    data: { fullName?: string; contactNumber?: string; location?: string },
+    data: { fullName?: string; birthday?: string; barangayId?: string },
   ) {
     this.logger.log(`Updating profile for user ${userId}`, UsersService.name);
 
@@ -66,6 +79,7 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id: userId },
       data,
+      include: { barangay: true },
     });
   }
 }
