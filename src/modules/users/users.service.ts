@@ -9,13 +9,13 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
-  ) { }
+  ) {}
 
   async getProfile(userId: string) {
     this.logger.log(`Fetching profile for user ${userId}`, UsersService.name);
-    let user = await this.prisma.user.findUnique({ 
+    let user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { barangay: true }
+      include: { barangay: true },
     });
 
     if (!user) {
@@ -35,11 +35,17 @@ export class UsersService {
         const publicMetadata = clerkUser.publicMetadata || {};
         const unsafeMetadata = clerkUser.unsafeMetadata || {};
 
-        const birthday = (publicMetadata.birthday || unsafeMetadata.birthday) as string | null;
-        const barangayId = (publicMetadata.barangay || unsafeMetadata.barangay) as string | null;
+        const birthday = (publicMetadata.birthday ||
+          unsafeMetadata.birthday) as string | null;
+        const barangayId = (publicMetadata.barangay ||
+          unsafeMetadata.barangay) as string | null;
 
-        const role = (publicMetadata.role || unsafeMetadata.role || 'operator') as string;
-        const status = (publicMetadata.status || unsafeMetadata.status || 'active') as string;
+        const role = (publicMetadata.role ||
+          unsafeMetadata.role ||
+          'operator') as string;
+        const status = (publicMetadata.status ||
+          unsafeMetadata.status ||
+          'active') as string;
 
         user = await this.prisma.user.upsert({
           where: { id: userId },
