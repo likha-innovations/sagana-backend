@@ -6,43 +6,110 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id            String   @id /// Clerk User ID (user_2bX...)
-  fullName      String?
-  email         String   @unique
-  contactNumber String?
-  location      String?
-  role          String   @default("user")
-  status        String   @default("active")
+model Organization {
+  id      String  @id @default(cuid())
+  code    String  @unique
+  name    String
+  address String?
+  status  String  @default("active")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  intakeRecords IntakeRecord[]
-  alerts        Alert[]
+  users    User[]
+  machines Machine[]
+  intakes  IntakeRecord[]
+  batches  CompostBatch[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String  @id /// Clerk User ID (user_2bX...)
+  organizationId String?
+  fullName       String?
+  email          String  @unique
+  contactNumber  String?
+  role           String  @default("user")
+  status         String  @default("active")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization?  @relation(fields: [organizationId], references: [id])
+  intakes      IntakeRecord[]
+  alerts       Alert[]        @relation("ResolvedAlerts")
 
   @@map("users")
 }
 
-model IntakeRecord {
-  id          String   @id @default(cuid())
-  userId      String
-  intakeDate  DateTime
-  totalWeight Float
-  status      String
-  notes       String?
+// 1. COMBINED MACHINE & CONTROLLER
+model Machine {
+  id             String    @id @default(cuid())
+  organizationId String
+  macAddress     String    @unique // From controller
+  name           String // From machine
+  status         String    @default("active")
+  lastSeen       DateTime? // From controller
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  batches      CompostBatch[]
+  alerts       Alert[]
+
+  @@map("machines")
+}
+
+model IntakeRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  intakeDate     DateTime
+  totalWeight    Float
+  status         String
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
   user         User          @relation(fields: [userId], references: [id])
+  items        IntakeItem[]
   compostBatch CompostBatch?
 
   @@map("intake_records")
 }
 
+model Feedstock {
+  id          String  @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  status      String  @default("active")
+
+  intakeItems IntakeItem[]
+
+  @@map("feedstocks")
+}
+
+model IntakeItem {
+  id          String @id @default(cuid())
+  intakeId    String
+  feedstockId String
+  weight      Float
+
+  intake    IntakeRecord @relation(fields: [intakeId], references: [id])
+  feedstock Feedstock    @relation(fields: [feedstockId], references: [id])
+
+  @@map("intake_items")
+}
+
 model CompostBatch {
   id             String    @id @default(cuid())
+  organizationId String
+  machineId      String
   intakeId       String    @unique
   batchCode      String    @unique
   startDate      DateTime
@@ -53,6 +120,8 @@ model CompostBatch {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  machine          Machine           @relation(fields: [machineId], references: [id])
   intake           IntakeRecord      @relation(fields: [intakeId], references: [id])
   compostOutput    CompostOutput?
   mlPredictions    MlPrediction[]
@@ -109,57 +178,30 @@ model CompostingPhase {
   @@map("composting_phases")
 }
 
+// 2. FLATTENED HORIZONTAL SCHEMA
 model SensorReading {
-  id        String        @id @default(cuid())
-  batchId   String?
-  sensorId  String
-  timestamp DateTime      @default(now())
-  value     Float
-  unit      String
+  id        String   @id @default(cuid())
+  batchId   String
+  timestamp DateTime @default(now())
 
-  batch  CompostBatch? @relation(fields: [batchId], references: [id])
-  sensor Sensor        @relation(fields: [sensorId], references: [id])
+  tempTop    Float?
+  tempMid    Float?
+  tempBottom Float?
+  moisture1  Float?
+  moisture2  Float?
+  co2        Float?
+  o2         Float?
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
 
   @@map("sensor_readings")
 }
 
-model Sensor {
-  id         String  @id @default(cuid())
-  deviceId   String
-  sensorType String
-  location   String?
-  unit       String
-  status     String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  device   IotDevice       @relation(fields: [deviceId], references: [id])
-  readings SensorReading[]
-
-  @@map("sensors")
-}
-
-model IotDevice {
-  id              String    @id @default(cuid())
-  deviceName      String
-  deviceType      String
-  processingStage String?
-  status          String
-  lastSeen        DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  sensors Sensor[]
-
-  @@map("iot_devices")
-}
-
 model Alert {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   batchId   String?
-  userId    String
+  machineId String?
+  userId    String? // The user who resolved it
   alertType String
   severity  String
   message   String
@@ -167,8 +209,9 @@ model Alert {
 
   createdAt DateTime @default(now())
 
-  batch CompostBatch? @relation(fields: [batchId], references: [id])
-  user  User          @relation(fields: [userId], references: [id])
+  batch   CompostBatch? @relation(fields: [batchId], references: [id])
+  machine Machine?      @relation(fields: [machineId], references: [id])
+  user    User?         @relation("ResolvedAlerts", fields: [userId], references: [id])
 
   @@map("alerts")
 }
