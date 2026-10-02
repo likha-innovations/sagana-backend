@@ -16,7 +16,17 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 20000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    pool.on('error', (err) => {
+      this.logger.warn(`Database pool idle client error: ${err.message}`);
+    });
+
     const adapter = new PrismaPg(pool);
     super({ adapter });
   }
