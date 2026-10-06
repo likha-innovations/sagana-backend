@@ -75,16 +75,31 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    data: { fullName?: string; birthday?: string; barangayId?: string },
+    data: { firstName?: string; lastName?: string; birthday?: string; barangayId?: string },
   ) {
     this.logger.log(`Updating profile for user ${userId}`, UsersService.name);
 
     // Ensure user exists before updating
-    await this.getProfile(userId);
+    const user = await this.getProfile(userId);
+    
+    const updateData: any = { ...data };
+    delete updateData.firstName;
+    delete updateData.lastName;
+
+    if (data.firstName !== undefined || data.lastName !== undefined) {
+      const parts = (user.fullName || '').split(' ');
+      const existingFirst = parts.length > 0 ? parts[0] : '';
+      const existingLast = parts.length > 1 ? parts.slice(1).join(' ') : '';
+      
+      const first = data.firstName !== undefined ? data.firstName : existingFirst;
+      const last = data.lastName !== undefined ? data.lastName : existingLast;
+      
+      updateData.fullName = `${first} ${last}`.trim();
+    }
 
     return this.prisma.user.update({
       where: { id: userId },
-      data,
+      data: updateData,
       include: { barangay: true },
     });
   }
