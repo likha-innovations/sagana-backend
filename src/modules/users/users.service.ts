@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
-
 import { createClerkClient } from '@clerk/backend';
 
 @Injectable()
@@ -11,40 +10,39 @@ export class UsersService {
     private readonly logger: LoggerService,
   ) {}
 
-  async getProfile(userId: string) {
-    this.logger.log(`Fetching profile for user ${userId}`, UsersService.name);
-    let user = await this.prisma.user.findUnique({ where: { id: userId } });
+  /** clerkUserId = payload.sub from the JWT (e.g. user_2bX…) */
+  async getProfile(clerkUserId: string) {
+    this.logger.log(
+      `Fetching profile for clerk user ${clerkUserId}`,
+      UsersService.name,
+    );
+    let user = await this.prisma.user.findUnique({
+      where: { clerkUserId },
+    });
 
     if (!user) {
       this.logger.log(
-        `User ${userId} not found in database, syncing from Clerk...`,
+        `User ${clerkUserId} not found in database, syncing from Clerk...`,
         UsersService.name,
       );
       try {
         const clerk = createClerkClient({
           secretKey: process.env.CLERK_SECRET_KEY,
         });
-        const clerkUser = await clerk.users.getUser(userId);
+        const clerkUser = await clerk.users.getUser(clerkUserId);
         const email = clerkUser.emailAddresses?.[0]?.emailAddress || '';
-        const fullName =
+        const name =
           `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
           null;
-        const contactNumber = clerkUser.phoneNumbers?.[0]?.phoneNumber || null;
 
         user = await this.prisma.user.upsert({
-          where: { id: userId },
-          update: { fullName, email, contactNumber },
-          create: {
-            id: userId,
-            fullName,
-            email,
-            contactNumber,
-            location: null,
-          },
+          where: { clerkUserId },
+          update: { name: name ?? undefined, email },
+          create: { clerkUserId, email, ...(name ? { name } : {}) },
         });
       } catch (err) {
         this.logger.warn(
-          `Failed to auto-sync user ${userId} from Clerk: ${err}`,
+          `Failed to auto-sync user ${clerkUserId} from Clerk: ${err}`,
           UsersService.name,
         );
         throw new NotFoundException('User profile not found');
@@ -54,18 +52,12 @@ export class UsersService {
     return user;
   }
 
-  async updateProfile(
-    userId: string,
-    data: { fullName?: string; contactNumber?: string; location?: string },
-  ) {
-    this.logger.log(`Updating profile for user ${userId}`, UsersService.name);
-
-    // Ensure user exists before updating
-    await this.getProfile(userId);
-
-    return this.prisma.user.update({
-      where: { id: userId },
-      data,
-    });
+  async updateProfile(clerkUserId: string, data: { name?: string }) {
+    this.logger.log(
+      `Updating profile for clerk user ${clerkUserId}`,
+      UsersService.name,
+    );
+    await this.getProfile(clerkUserId);
+    return this.prisma.user.update({ where: { clerkUserId }, data });
   }
 }

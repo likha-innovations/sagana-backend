@@ -81,21 +81,23 @@ export class WebhooksController {
 
     if (eventType === 'user.created' || eventType === 'user.updated') {
       const email = evt.data.email_addresses?.[0]?.email_address || '';
-      const fullName =
-        `${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim();
-      const contactNumber = evt.data.phone_numbers?.[0]?.phone_number || null;
+      const name =
+        `${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim() ||
+        null;
 
       await this.prisma.user.upsert({
-        where: { id },
-        update: { fullName, email, contactNumber },
-        create: { id, fullName, email, contactNumber, location: null },
+        where: { clerkUserId: id },
+        update: { name: name ?? undefined, email },
+        create: { clerkUserId: id, email, ...(name ? { name } : {}) },
       });
       this.logger.log(
         `User ${id} successfully synced to Neon database`,
         WebhooksController.name,
       );
     } else if (eventType === 'user.deleted') {
-      await this.prisma.user.delete({ where: { id } }).catch(() => {});
+      await this.prisma.user
+        .delete({ where: { clerkUserId: id } })
+        .catch(() => {});
       this.logger.log(
         `User ${id} successfully deleted from Neon database`,
         WebhooksController.name,
