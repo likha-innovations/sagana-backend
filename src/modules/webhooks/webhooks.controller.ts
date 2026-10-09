@@ -89,8 +89,7 @@ export class WebhooksController {
       const barangayId =
         (publicMetadata.barangay || unsafeMetadata.barangay) ?? undefined;
       const role = publicMetadata.role || unsafeMetadata.role || 'operator';
-      const status =
-        publicMetadata.status || unsafeMetadata.status || 'active';
+      const status = publicMetadata.status || unsafeMetadata.status || 'active';
 
       await this.prisma.user.upsert({
         where: { clerkUserId: id },

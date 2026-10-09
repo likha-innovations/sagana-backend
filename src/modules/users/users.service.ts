@@ -76,12 +76,14 @@ export class UsersService {
       const parts = (user.name || '').split(' ');
       const existingFirst = parts.length > 0 ? parts[0] : '';
       const existingLast = parts.length > 1 ? parts.slice(1).join(' ') : '';
-      const first = data.firstName !== undefined ? data.firstName : existingFirst;
+      const first =
+        data.firstName !== undefined ? data.firstName : existingFirst;
       const last = data.lastName !== undefined ? data.lastName : existingLast;
       updateData.name = `${first} ${last}`.trim();
     }
 
-    if (data.birthday !== undefined) updateData.birthday = new Date(data.birthday);
+    if (data.birthday !== undefined)
+      updateData.birthday = new Date(data.birthday);
     if (data.barangayId !== undefined) updateData.barangayId = data.barangayId;
 
     return this.prisma.user.update({
