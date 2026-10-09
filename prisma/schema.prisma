@@ -6,31 +6,184 @@ datasource db {
   provider = "postgresql"
 }
 
+model Barangay {
+  id        String   @id @default(cuid()) @map("barangay_id")
+  code      String   @unique
+  name      String
+  address   String?
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users    User[]
+  machines AivspMachine[]
+
+  @@map("barangays")
+}
+
 model User {
-  id            String   @id /// Clerk User ID (user_2bX...)
-  fullName      String?
-  email         String   @unique
-  birthday      String?
-  barangayId    String?
-  role          String   @default("operator")
-  status        String   @default("active")
+  id          String    @id @default(cuid()) @map("user_id")
+  barangayId  String?   @map("barangay_id")
+  clerkUserId String    @unique @map("clerk_user_id")
+  name        String?
+  birthday    DateTime?
+  email       String    @unique
+  role        String    @default("operator")
+  status      String    @default("active")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  barangay      Barangay?      @relation(fields: [barangayId], references: [id])
+  barangay       Barangay?      @relation(fields: [barangayId], references: [id])
+  batches        CompostBatch[]
+  resolvedAlerts Alert[]        @relation("AlertResolvedBy")
 
   @@map("users")
 }
 
-model Barangay {
-  id        String   @id @default(cuid())
-  name      String
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model AivspMachine {
+  id         String    @id @default(cuid()) @map("machine_id")
+  barangayId String    @map("barangay_id")
+  macAddress String    @unique @map("mac_address")
+  name       String
+  status     String    @default("active")
+  wifiSsid   String?   @map("wifi_ssid")
+  lastSeen   DateTime? @map("last_seen")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  removedAt  DateTime? @map("removed_at")
 
-  users     User[]
+  barangay Barangay       @relation(fields: [barangayId], references: [id])
+  batches  CompostBatch[]
+  alerts   Alert[]
+  sensors  Sensor[]
 
-  @@map("barangays")
+  @@map("aivsp_machines")
+}
+
+model Alert {
+  id               String    @id @default(cuid()) @map("alert_id")
+  batchId          String?   @map("batch_id")
+  machineId        String?   @map("machine_id")
+  resolvedByUserId String?   @map("resolved_by_user_id")
+  alertType        String    @map("alert_type")
+  severity         String
+  message          String
+  resolvedAt       DateTime? @map("resolved_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  status           String    @default("active")
+
+  batch      CompostBatch? @relation(fields: [batchId], references: [id])
+  machine    AivspMachine? @relation(fields: [machineId], references: [id])
+  resolvedBy User?         @relation("AlertResolvedBy", fields: [resolvedByUserId], references: [id])
+
+  @@map("alerts")
+}
+
+model CompostBatch {
+  id             String    @id @default(cuid()) @map("batch_id")
+  machineId      String    @map("machine_id")
+  userId         String    @map("user_id")
+  totalWeight    Float     @map("total_weight")
+  batchCode      String    @unique @map("batch_code")
+  startDate      DateTime  @map("start_date")
+  completionDate DateTime? @map("completion_date")
+  status         String    @default("active")
+
+  machine          AivspMachine      @relation(fields: [machineId], references: [id])
+  user             User              @relation(fields: [userId], references: [id])
+  feedstocks       BatchFeedstock[]
+  compostOutput    CompostOutput?
+  mlPredictions    MlPrediction[]
+  compostingPhases CompostingPhase[]
+  sensorReadings   SensorReading[]
+  alerts           Alert[]
+
+  @@map("compost_batches")
+}
+
+model Feedstock {
+  id          String  @id @default(cuid()) @map("feedstock_id")
+  name        String
+  category    String
+  description String?
+  status      String  @default("active")
+
+  batchFeedstocks BatchFeedstock[]
+
+  @@map("feedstocks")
+}
+
+model BatchFeedstock {
+  id          String @id @default(cuid()) @map("batch_feedstock_id")
+  batchId     String @map("batch_id")
+  feedstockId String @map("feedstock_id")
+  weight      Float
+
+  batch     CompostBatch @relation(fields: [batchId], references: [id])
+  feedstock Feedstock    @relation(fields: [feedstockId], references: [id])
+
+  @@map("batch_feedstocks")
+}
+
+model CompostOutput {
+  id             String    @id @default(cuid()) @map("output_id")
+  batchId        String    @unique @map("batch_id")
+  outputWeight   Float     @map("output_weight")
+  productionDate DateTime  @map("production_date")
+  collectionDate DateTime? @map("collection_date")
+  status         String    @default("active")
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("compost_outputs")
+}
+
+model MlPrediction {
+  id                     String   @id @default(cuid()) @map("prediction_id")
+  batchId                String   @map("batch_id")
+  predictedPhase         String   @map("predicted_phase")
+  confidenceScore        Float    @map("confidence_score")
+  predictedDaysRemaining Int?     @map("predicted_days_remaining")
+  predictionTime         DateTime @default(now()) @map("prediction_time")
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("ml_predictions")
+}
+
+model CompostingPhase {
+  id        String    @id @default(cuid()) @map("phase_id")
+  batchId   String    @map("batch_id")
+  phaseName String    @map("phase_name")
+  startTime DateTime  @map("start_time")
+  endTime   DateTime? @map("end_time")
+  status    String    @default("active")
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("composting_phases")
+}
+
+model Sensor {
+  id         String  @id @default(cuid()) @map("sensor_id")
+  machineId  String  @map("machine_id")
+  sensorType String  @map("sensor_type")
+  location   String?
+  unit       String?
+  status     String  @default("active")
+
+  machine        AivspMachine    @relation(fields: [machineId], references: [id])
+  sensorReadings SensorReading[]
+
+  @@map("sensors")
+}
+
+model SensorReading {
+  id         String   @id @default(cuid()) @map("reading_id")
+  batchId    String   @map("batch_id")
+  sensorId   String   @map("sensor_id")
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  value      Float
+
+  batch  CompostBatch @relation(fields: [batchId], references: [id])
+  sensor Sensor       @relation(fields: [sensorId], references: [id])
+
+  @@map("sensor_readings")
 }

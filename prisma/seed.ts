@@ -14,18 +14,20 @@ async function main() {
   // 1. Seed Barangays
   console.log('Seeding Barangays 170-180...');
   
-  const barangays = Array.from({ length: 11 }, (_, i) => `Barangay ${170 + i}`);
-  
-  for (const name of barangays) {
-    const id = `brgy_${name.replace(' ', '_').toLowerCase()}`;
+  const barangays = Array.from({ length: 11 }, (_, i) => ({
+    number: 170 + i,
+    name: `Barangay ${170 + i}`,
+  }));
+
+  for (const brgy of barangays) {
+    const id = `brgy_${brgy.number}`;
     await prisma.barangay.upsert({
-      where: { 
-        id
-      },
+      where: { id },
       update: {},
       create: {
         id,
-        name,
+        code: String(brgy.number),
+        name: brgy.name,
       },
     });
   }
