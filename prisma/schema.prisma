@@ -31,9 +31,8 @@ model User {
   status      String    @default("active")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  barangay       Barangay?      @relation(fields: [barangayId], references: [id])
-  batches        CompostBatch[]
-  resolvedAlerts Alert[]        @relation("AlertResolvedBy")
+  barangay Barangay?      @relation(fields: [barangayId], references: [id])
+  batches  CompostBatch[]
 
   @@map("users")
 }
@@ -51,29 +50,9 @@ model AivspMachine {
 
   barangay Barangay       @relation(fields: [barangayId], references: [id])
   batches  CompostBatch[]
-  alerts   Alert[]
   sensors  Sensor[]
 
   @@map("aivsp_machines")
-}
-
-model Alert {
-  id               String    @id @default(cuid()) @map("alert_id")
-  batchId          String?   @map("batch_id")
-  machineId        String?   @map("machine_id")
-  resolvedByUserId String?   @map("resolved_by_user_id")
-  alertType        String    @map("alert_type")
-  severity         String
-  message          String
-  resolvedAt       DateTime? @map("resolved_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  status           String    @default("active")
-
-  batch      CompostBatch? @relation(fields: [batchId], references: [id])
-  machine    AivspMachine? @relation(fields: [machineId], references: [id])
-  resolvedBy User?         @relation("AlertResolvedBy", fields: [resolvedByUserId], references: [id])
-
-  @@map("alerts")
 }
 
 model CompostBatch {
@@ -90,10 +69,8 @@ model CompostBatch {
   user             User              @relation(fields: [userId], references: [id])
   feedstocks       BatchFeedstock[]
   compostOutput    CompostOutput?
-  mlPredictions    MlPrediction[]
   compostingPhases CompostingPhase[]
   sensorReadings   SensorReading[]
-  alerts           Alert[]
 
   @@map("compost_batches")
 }
@@ -133,19 +110,6 @@ model CompostOutput {
   batch CompostBatch @relation(fields: [batchId], references: [id])
 
   @@map("compost_outputs")
-}
-
-model MlPrediction {
-  id                     String   @id @default(cuid()) @map("prediction_id")
-  batchId                String   @map("batch_id")
-  predictedPhase         String   @map("predicted_phase")
-  confidenceScore        Float    @map("confidence_score")
-  predictedDaysRemaining Int?     @map("predicted_days_remaining")
-  predictionTime         DateTime @default(now()) @map("prediction_time")
-
-  batch CompostBatch @relation(fields: [batchId], references: [id])
-
-  @@map("ml_predictions")
 }
 
 model CompostingPhase {
