@@ -20,9 +20,9 @@ export class MachinesService {
       MachinesService.name,
     );
 
-    // 1. Look up user's barangay_id via their Clerk ID
+    // 1. Look up user's barangay_id
     const user = await this.prisma.user.findUnique({
-      where: { clerkUserId: userId },
+      where: { id: userId },
       select: { barangayId: true },
     });
 

@@ -10,41 +10,38 @@ export class UsersService {
     private readonly logger: LoggerService,
   ) {}
 
-  /** clerkUserId = payload.sub from the JWT (e.g. user_2bX…) */
-  async getProfile(clerkUserId: string) {
-    this.logger.log(
-      `Fetching profile for clerk user ${clerkUserId}`,
-      UsersService.name,
-    );
+  /** userId = Clerk user ID (payload.sub from JWT, e.g. user_2bX…) */
+  async getProfile(userId: string) {
+    this.logger.log(`Fetching profile for user ${userId}`, UsersService.name);
     let user = await this.prisma.user.findUnique({
-      where: { clerkUserId },
+      where: { id: userId },
       include: { barangay: true },
     });
 
     if (!user) {
       this.logger.log(
-        `User ${clerkUserId} not found in database, syncing from Clerk...`,
+        `User ${userId} not found in database, syncing from Clerk...`,
         UsersService.name,
       );
       try {
         const clerk = createClerkClient({
           secretKey: process.env.CLERK_SECRET_KEY,
         });
-        const clerkUser = await clerk.users.getUser(clerkUserId);
+        const clerkUser = await clerk.users.getUser(userId);
         const email = clerkUser.emailAddresses?.[0]?.emailAddress || '';
         const name =
           `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
           null;
 
         user = await this.prisma.user.upsert({
-          where: { clerkUserId },
+          where: { id: userId },
           update: { name: name ?? undefined, email },
-          create: { clerkUserId, email, ...(name ? { name } : {}) },
+          create: { id: userId, email, ...(name ? { name } : {}) },
           include: { barangay: true },
         });
       } catch (err) {
         this.logger.warn(
-          `Failed to auto-sync user ${clerkUserId} from Clerk: ${err}`,
+          `Failed to auto-sync user ${userId} from Clerk: ${err}`,
           UsersService.name,
         );
         throw new NotFoundException('User profile not found');
@@ -55,7 +52,7 @@ export class UsersService {
   }
 
   async updateProfile(
-    clerkUserId: string,
+    userId: string,
     data: {
       firstName?: string;
       lastName?: string;
@@ -63,12 +60,9 @@ export class UsersService {
       barangayId?: string;
     },
   ) {
-    this.logger.log(
-      `Updating profile for clerk user ${clerkUserId}`,
-      UsersService.name,
-    );
+    this.logger.log(`Updating profile for user ${userId}`, UsersService.name);
 
-    const user = await this.getProfile(clerkUserId);
+    const user = await this.getProfile(userId);
 
     const updateData: Record<string, unknown> = {};
 
@@ -87,7 +81,7 @@ export class UsersService {
     if (data.barangayId !== undefined) updateData.barangayId = data.barangayId;
 
     return this.prisma.user.update({
-      where: { clerkUserId },
+      where: { id: userId },
       data: updateData,
       include: { barangay: true },
     });

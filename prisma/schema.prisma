@@ -21,15 +21,14 @@ model Barangay {
 }
 
 model User {
-  id          String    @id @default(cuid()) @map("user_id")
-  barangayId  String?   @map("barangay_id")
-  clerkUserId String    @unique @map("clerk_user_id")
-  name        String?
-  birthday    DateTime?
-  email       String    @unique
-  role        String    @default("operator")
-  status      String    @default("active")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id         String    @id @map("user_id") /// Clerk User ID (user_2bX...)
+  barangayId String?   @map("barangay_id")
+  name       String?
+  birthday   DateTime?
+  email      String    @unique
+  role       String    @default("operator")
+  status     String    @default("active")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   barangay Barangay?      @relation(fields: [barangayId], references: [id])
   batches  CompostBatch[]

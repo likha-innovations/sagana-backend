@@ -92,7 +92,7 @@ export class WebhooksController {
       const status = publicMetadata.status || unsafeMetadata.status || 'active';
 
       await this.prisma.user.upsert({
-        where: { clerkUserId: id },
+        where: { id },
         update: {
           name: name ?? undefined,
           email,
@@ -101,7 +101,7 @@ export class WebhooksController {
           status,
         },
         create: {
-          clerkUserId: id,
+          id,
           email,
           ...(name ? { name } : {}),
           ...(barangayId ? { barangayId } : {}),
@@ -114,9 +114,7 @@ export class WebhooksController {
         WebhooksController.name,
       );
     } else if (eventType === 'user.deleted') {
-      await this.prisma.user
-        .delete({ where: { clerkUserId: id } })
-        .catch(() => {});
+      await this.prisma.user.delete({ where: { id } }).catch(() => {});
       this.logger.log(
         `User ${id} successfully deleted from Neon database`,
         WebhooksController.name,
