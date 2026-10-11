@@ -37,7 +37,7 @@ export class MachinesService {
     }
 
     // 2. Check for duplicate MAC address
-    const existing = await this.prisma.aivspMachine.findUnique({
+    const existing = await this.prisma.machine.findUnique({
       where: { macAddress: dto.mac_address },
     });
 
@@ -48,7 +48,7 @@ export class MachinesService {
     }
 
     // 3. Create the machine
-    const machine = await this.prisma.aivspMachine.create({
+    const machine = await this.prisma.machine.create({
       data: {
         barangayId: user.barangayId,
         macAddress: dto.mac_address,

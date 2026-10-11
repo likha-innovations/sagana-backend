@@ -15,7 +15,7 @@ model Barangay {
   createdAt DateTime @default(now()) @map("created_at")
 
   users    User[]
-  machines AivspMachine[]
+  machines Machine[]
 
   @@map("barangays")
 }
@@ -36,7 +36,7 @@ model User {
   @@map("users")
 }
 
-model AivspMachine {
+model Machine {
   id         String    @id @default(cuid()) @map("machine_id")
   barangayId String    @map("barangay_id")
   macAddress String    @unique @map("mac_address")
@@ -51,7 +51,7 @@ model AivspMachine {
   batches  CompostBatch[]
   sensors  Sensor[]
 
-  @@map("aivsp_machines")
+  @@map("machines")
 }
 
 model CompostBatch {
@@ -64,7 +64,7 @@ model CompostBatch {
   completionDate DateTime? @map("completion_date")
   status         String    @default("active")
 
-  machine          AivspMachine      @relation(fields: [machineId], references: [id])
+  machine          Machine           @relation(fields: [machineId], references: [id])
   user             User              @relation(fields: [userId], references: [id])
   feedstocks       BatchFeedstock[]
   compostOutput    CompostOutput?
@@ -132,7 +132,7 @@ model Sensor {
   unit       String?
   status     String  @default("active")
 
-  machine        AivspMachine    @relation(fields: [machineId], references: [id])
+  machine        Machine         @relation(fields: [machineId], references: [id])
   sensorReadings SensorReading[]
 
   @@map("sensors")
