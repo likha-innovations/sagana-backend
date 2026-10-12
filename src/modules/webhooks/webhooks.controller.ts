@@ -82,17 +82,24 @@ export class WebhooksController {
     if (eventType === 'user.created' || eventType === 'user.updated') {
       const email = evt.data.email_addresses?.[0]?.email_address || '';
       const fullName =
-        `${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim();
+        `${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim() ||
+        null;
       const publicMetadata = evt.data.public_metadata || {};
       const unsafeMetadata = evt.data.unsafe_metadata || {};
 
-      const birthday =
-        publicMetadata.birthday || unsafeMetadata.birthday || null;
-      const barangayId =
-        publicMetadata.barangay || unsafeMetadata.barangay || null;
+      const birthdayRaw = (publicMetadata.birthday ||
+        unsafeMetadata.birthday) as string | null;
+      const birthday = birthdayRaw ? new Date(birthdayRaw) : null;
+      const barangayId = (publicMetadata.barangay ||
+        unsafeMetadata.barangay ||
+        null) as string | null;
 
-      const role = publicMetadata.role || unsafeMetadata.role || 'operator';
-      const status = publicMetadata.status || unsafeMetadata.status || 'active';
+      const role = (publicMetadata.role ||
+        unsafeMetadata.role ||
+        'operator') as string;
+      const status = (publicMetadata.status ||
+        unsafeMetadata.status ||
+        'active') as string;
 
       await this.prisma.user.upsert({
         where: { id },

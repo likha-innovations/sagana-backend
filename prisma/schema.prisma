@@ -6,31 +6,145 @@ datasource db {
   provider = "postgresql"
 }
 
+model Barangay {
+  id        String   @id @default(cuid()) @map("barangay_id")
+  name      String
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users    User[]
+  machines Machine[]
+
+  @@map("barangays")
+}
+
 model User {
-  id            String   @id /// Clerk User ID (user_2bX...)
-  fullName      String?
-  email         String   @unique
-  birthday      String?
-  barangayId    String?
-  role          String   @default("operator")
-  status        String   @default("active")
+  id         String    @id @map("user_id") /// Clerk User ID (user_2bX...)
+  barangayId String?   @map("barangay_id")
+  fullName   String?   @map("name")
+  birthday   DateTime?
+  email      String    @unique
+  role       String    @default("operator")
+  status     String    @default("active")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  barangay      Barangay?      @relation(fields: [barangayId], references: [id])
+  barangay Barangay?      @relation(fields: [barangayId], references: [id])
+  batches  CompostBatch[]
 
   @@map("users")
 }
 
-model Barangay {
-  id        String   @id @default(cuid())
-  name      String
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Machine {
+  id         String    @id @default(cuid()) @map("machine_id")
+  barangayId String    @map("barangay_id")
+  macAddress String    @unique @map("mac_address")
+  name       String
+  status     String    @default("active")
+  wifiSsid   String?   @map("wifi_ssid")
+  lastSeen   DateTime? @map("last_seen")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  removedAt  DateTime? @map("removed_at")
 
-  users     User[]
+  barangay Barangay       @relation(fields: [barangayId], references: [id])
+  batches  CompostBatch[]
+  sensors  Sensor[]
 
-  @@map("barangays")
+  @@map("machines")
+}
+
+model CompostBatch {
+  id             String    @id @default(cuid()) @map("batch_id")
+  machineId      String    @map("machine_id")
+  userId         String    @map("user_id")
+  totalWeight    Float     @map("total_weight")
+  batchCode      String    @unique @map("batch_code")
+  startDate      DateTime  @map("start_date")
+  completionDate DateTime? @map("completion_date")
+  status         String    @default("active")
+
+  machine          Machine           @relation(fields: [machineId], references: [id])
+  user             User              @relation(fields: [userId], references: [id])
+  feedstocks       BatchFeedstock[]
+  compostOutput    CompostOutput?
+  compostingPhases CompostingPhase[]
+  sensorReadings   SensorReading[]
+
+  @@map("compost_batches")
+}
+
+model Feedstock {
+  id          String  @id @default(cuid()) @map("feedstock_id")
+  name        String
+  category    String
+  description String?
+  status      String  @default("active")
+
+  batchFeedstocks BatchFeedstock[]
+
+  @@map("feedstocks")
+}
+
+model BatchFeedstock {
+  id          String @id @default(cuid()) @map("batch_feedstock_id")
+  batchId     String @map("batch_id")
+  feedstockId String @map("feedstock_id")
+  weight      Float
+
+  batch     CompostBatch @relation(fields: [batchId], references: [id])
+  feedstock Feedstock    @relation(fields: [feedstockId], references: [id])
+
+  @@map("batch_feedstocks")
+}
+
+model CompostOutput {
+  id             String    @id @default(cuid()) @map("output_id")
+  batchId        String    @unique @map("batch_id")
+  outputWeight   Float     @map("output_weight")
+  productionDate DateTime  @map("production_date")
+  collectionDate DateTime? @map("collection_date")
+  status         String    @default("active")
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("compost_outputs")
+}
+
+model CompostingPhase {
+  id        String    @id @default(cuid()) @map("phase_id")
+  batchId   String    @map("batch_id")
+  phaseName String    @map("phase_name")
+  startTime DateTime  @map("start_time")
+  endTime   DateTime? @map("end_time")
+  status    String    @default("active")
+
+  batch CompostBatch @relation(fields: [batchId], references: [id])
+
+  @@map("composting_phases")
+}
+
+model Sensor {
+  id         String  @id @default(cuid()) @map("sensor_id")
+  machineId  String  @map("machine_id")
+  sensorType String  @map("sensor_type")
+  location   String?
+  unit       String?
+  status     String  @default("active")
+
+  machine        Machine         @relation(fields: [machineId], references: [id])
+  sensorReadings SensorReading[]
+
+  @@map("sensors")
+}
+
+model SensorReading {
+  id         String   @id @default(cuid()) @map("reading_id")
+  batchId    String   @map("batch_id")
+  sensorId   String   @map("sensor_id")
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  value      Float
+
+  batch  CompostBatch @relation(fields: [batchId], references: [id])
+  sensor Sensor       @relation(fields: [sensorId], references: [id])
+
+  @@map("sensor_readings")
 }

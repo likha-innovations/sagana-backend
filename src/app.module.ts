@@ -9,9 +9,10 @@ import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { MqttModule } from './infrastructure/mqtt/mqtt.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { MachinesModule } from './modules/machines/machines.module';
+import { BarangaysModule } from './modules/barangays/barangays.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
-import { BarangaysModule } from './modules/barangays/barangays.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { BarangaysModule } from './modules/barangays/barangays.module';
     UsersModule,
     WebhooksModule,
     BarangaysModule,
+    MachinesModule,
   ],
   controllers: [AppController],
   providers: [
