@@ -21,7 +21,7 @@ model Barangay {
 model User {
   id         String    @id @map("user_id") /// Clerk User ID (user_2bX...)
   barangayId String?   @map("barangay_id")
-  name       String?
+  fullName   String?   @map("name")
   birthday   DateTime?
   email      String    @unique
   role       String    @default("operator")
