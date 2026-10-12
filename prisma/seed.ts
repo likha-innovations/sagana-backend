@@ -11,7 +11,6 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('Starting seed...');
 
-  // 1. Seed Barangays
   console.log('Seeding Barangays 170-180...');
   
   const barangays = Array.from({ length: 11 }, (_, i) => ({
@@ -23,10 +22,11 @@ async function main() {
     const id = `brgy_${brgy.number}`;
     await prisma.barangay.upsert({
       where: { id },
-      update: {},
+      update: {
+        name: brgy.name,
+      },
       create: {
         id,
-        code: String(brgy.number),
         name: brgy.name,
       },
     });

@@ -8,9 +8,7 @@ datasource db {
 
 model Barangay {
   id        String   @id @default(cuid()) @map("barangay_id")
-  code      String   @unique
   name      String
-  address   String?
   status    String   @default("active")
   createdAt DateTime @default(now()) @map("created_at")
 
