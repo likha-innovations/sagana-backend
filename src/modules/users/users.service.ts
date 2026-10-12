@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
+import { createClerkClient } from '@clerk/backend';
 
 @Injectable()
 export class UsersService {
@@ -11,13 +12,74 @@ export class UsersService {
 
   async getProfile(userId: string) {
     this.logger.log(`Fetching profile for user ${userId}`, UsersService.name);
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { barangay: true },
     });
 
     if (!user) {
-      throw new NotFoundException('User profile not found');
+      this.logger.log(
+        `User ${userId} not found in database, syncing from Clerk...`,
+        UsersService.name,
+      );
+      try {
+        const clerk = createClerkClient({
+          secretKey: process.env.CLERK_SECRET_KEY,
+        });
+        const clerkUser = await clerk.users.getUser(userId);
+        const email = clerkUser.emailAddresses?.[0]?.emailAddress || '';
+        const publicMetadata = clerkUser.publicMetadata || {};
+        const unsafeMetadata = clerkUser.unsafeMetadata || {};
+
+        const fullName =
+          clerkUser.fullName ||
+          (unsafeMetadata.fullName as string | undefined) ||
+          `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
+          null;
+
+        const birthdayRaw = (publicMetadata.birthday ||
+          unsafeMetadata.birthday) as string | null;
+        const birthday = birthdayRaw ? new Date(birthdayRaw) : null;
+
+        const rawBarangay = (publicMetadata.barangay ||
+          unsafeMetadata.barangay) as string | null;
+        const barangayId = rawBarangay?.trim() ? rawBarangay.trim() : null;
+
+        const role = (publicMetadata.role ||
+          unsafeMetadata.role ||
+          'operator') as string;
+        const status = (publicMetadata.status ||
+          unsafeMetadata.status ||
+          'active') as string;
+
+        user = await this.prisma.user.upsert({
+          where: { id: userId },
+          update: {
+            fullName,
+            email,
+            birthday,
+            barangayId,
+            role,
+            status,
+          },
+          create: {
+            id: userId,
+            fullName,
+            email,
+            birthday,
+            barangayId,
+            role,
+            status,
+          },
+          include: { barangay: true },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Failed to auto-sync user ${userId} from Clerk: ${err}`,
+          UsersService.name,
+        );
+        throw new NotFoundException('User profile not found');
+      }
     }
 
     return user;
