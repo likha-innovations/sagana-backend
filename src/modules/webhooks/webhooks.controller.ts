@@ -81,33 +81,30 @@ export class WebhooksController {
 
     if (eventType === 'user.created' || eventType === 'user.updated') {
       const email = evt.data.email_addresses?.[0]?.email_address || '';
-      const name =
+      const fullName =
         `${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim() ||
         null;
       const publicMetadata = evt.data.public_metadata || {};
       const unsafeMetadata = evt.data.unsafe_metadata || {};
-      const barangayId =
-        (publicMetadata.barangay || unsafeMetadata.barangay) ?? undefined;
-      const role = publicMetadata.role || unsafeMetadata.role || 'operator';
-      const status = publicMetadata.status || unsafeMetadata.status || 'active';
+
+      const birthdayRaw = (publicMetadata.birthday ||
+        unsafeMetadata.birthday) as string | null;
+      const birthday = birthdayRaw ? new Date(birthdayRaw) : null;
+      const barangayId = (publicMetadata.barangay ||
+        unsafeMetadata.barangay ||
+        null) as string | null;
+
+      const role = (publicMetadata.role ||
+        unsafeMetadata.role ||
+        'operator') as string;
+      const status = (publicMetadata.status ||
+        unsafeMetadata.status ||
+        'active') as string;
 
       await this.prisma.user.upsert({
         where: { id },
-        update: {
-          name: name ?? undefined,
-          email,
-          barangayId,
-          role,
-          status,
-        },
-        create: {
-          id,
-          email,
-          ...(name ? { name } : {}),
-          ...(barangayId ? { barangayId } : {}),
-          role,
-          status,
-        },
+        update: { fullName, email, birthday, barangayId, role, status },
+        create: { id, fullName, email, birthday, barangayId, role, status },
       });
       this.logger.log(
         `User ${id} successfully synced to Neon database`,
