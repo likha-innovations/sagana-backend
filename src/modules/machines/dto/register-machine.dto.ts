@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { createZodDto } from 'nestjs-zod';
 
 export const RegisterMachineSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -12,4 +13,4 @@ export const RegisterMachineSchema = z.object({
   wifi_ssid: z.string().min(1, 'WiFi SSID is required'),
 });
 
-export type RegisterMachineDto = z.infer<typeof RegisterMachineSchema>;
+export class RegisterMachineDto extends createZodDto(RegisterMachineSchema) {}

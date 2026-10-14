@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
-import { RegisterMachineDto } from './dto/register-machine.dto';
+import type { RegisterMachineDto } from './dto/register-machine.dto';
 
 @Injectable()
 export class MachinesService {
@@ -13,6 +13,37 @@ export class MachinesService {
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
   ) {}
+
+  private async getBarangayId(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { barangayId: true },
+    });
+    if (!user) {
+      throw new NotFoundException('Authenticated user not found in database');
+    }
+    return user.barangayId;
+  }
+
+  async findAll(userId: string) {
+    const barangayId = await this.getBarangayId(userId);
+    if (!barangayId) return [];
+    return this.prisma.machine.findMany({
+      where: { barangayId, removedAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  async findOne(userId: string, id: string) {
+    const barangayId = await this.getBarangayId(userId);
+    const machine = barangayId
+      ? await this.prisma.machine.findFirst({
+          where: { id, barangayId, removedAt: null },
+        })
+      : null;
+    if (!machine) throw new NotFoundException('Machine not found');
+    return machine;
+  }
 
   async register(userId: string, dto: RegisterMachineDto) {
     this.logger.log(
