@@ -36,15 +36,29 @@ export class MachinesService {
       );
     }
 
-    // 2. Check for duplicate MAC address
+    // 2. Check for duplicate MAC
     const existing = await this.prisma.machine.findUnique({
       where: { macAddress: dto.mac_address },
     });
 
     if (existing) {
-      throw new ConflictException(
-        'This MAC address is already registered to an existing machine.',
+      if (existing.barangayId !== user.barangayId) {
+        throw new ConflictException(
+          'This machine is already registered to a different barangay.',
+        );
+      }
+
+      // Same barangay — device was re-provisioned (NVS wiped), update credentials
+      const machine = await this.prisma.machine.update({
+        where: { macAddress: dto.mac_address },
+        data: { name: dto.name, wifiSsid: dto.wifi_ssid, status: 'active' },
+      });
+
+      this.logger.log(
+        `Machine re-provisioned: id=${machine.id}`,
+        MachinesService.name,
       );
+      return machine;
     }
 
     // 3. Create the machine

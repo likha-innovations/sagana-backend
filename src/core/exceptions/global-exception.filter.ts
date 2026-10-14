@@ -24,10 +24,29 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exResponse = exception.getResponse();
-      message =
+      const rawMsg =
         typeof exResponse === 'string'
           ? exResponse
-          : (exResponse as any).message || exception.message;
+          : (exResponse as { message?: unknown }).message || exception.message;
+
+      if (Array.isArray(rawMsg)) {
+        message = rawMsg
+          .map((m) =>
+            typeof m === 'object' && m !== null
+              ? (m as { message?: string }).message || JSON.stringify(m)
+              : typeof m === 'string'
+                ? m
+                : JSON.stringify(m),
+          )
+          .join(', ');
+      } else if (typeof rawMsg === 'object' && rawMsg !== null) {
+        message =
+          (rawMsg as { message?: string }).message || JSON.stringify(rawMsg);
+      } else if (typeof rawMsg === 'string') {
+        message = rawMsg;
+      } else {
+        message = JSON.stringify(rawMsg) ?? exception.message;
+      }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       this.logger.error(
         `Prisma query error [${exception.code}]: ${exception.message}`,
