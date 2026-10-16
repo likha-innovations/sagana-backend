@@ -13,4 +13,3 @@ export const RegisterMachineSchema = z.object({
 });
 
 export type RegisterMachineDto = z.infer<typeof RegisterMachineSchema>;
-
