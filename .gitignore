@@ -39,3 +39,5 @@ documentation/
 # Vitepress
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+
+tasks/
