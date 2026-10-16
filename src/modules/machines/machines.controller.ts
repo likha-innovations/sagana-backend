@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   HttpCode,
   HttpStatus,
   Post,
@@ -17,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { MachinesService } from './machines.service';
 import { RegisterMachineDto } from './dto/register-machine.dto';
+import { UpdateMachineDto } from './dto/update-machine.dto';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 
 @ApiTags('Machines')
@@ -52,6 +55,35 @@ export class MachinesController {
   })
   findOne(@CurrentUserId() userId: string, @Param('id') id: string) {
     return this.machinesService.findOne(userId, id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary:
+      'Update machine name or Wi-Fi SSID in the authenticated user barangay',
+  })
+  @ApiResponse({ status: 200, description: 'Machine updated successfully.' })
+  @ApiResponse({ status: 400, description: 'Validation error.' })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 404, description: 'Machine not found.' })
+  @UsePipes(ZodValidationPipe)
+  update(
+    @CurrentUserId() userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateMachineDto,
+  ) {
+    return this.machinesService.update(userId, id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Soft-remove a machine in the authenticated user barangay',
+  })
+  @ApiResponse({ status: 200, description: 'Machine removed successfully.' })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 404, description: 'Machine not found.' })
+  remove(@CurrentUserId() userId: string, @Param('id') id: string) {
+    return this.machinesService.remove(userId, id);
   }
 
   @Post('register')
