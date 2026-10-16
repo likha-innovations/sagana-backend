@@ -32,6 +32,9 @@ describe('Machine read access', () => {
     machine: {
       findMany: jest.fn(({ where }) => matching(where)),
       findFirst: jest.fn(({ where }) => matching(where)[0] ?? null),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -141,4 +144,46 @@ describe('Machine read access', () => {
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
     },
   );
+
+  describe('POST /machines/register', () => {
+    it('registers a machine successfully with valid payload', async () => {
+      prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
+      prisma.machine.findUnique.mockResolvedValue(null);
+      prisma.machine.create.mockResolvedValue({
+        id: 'new-machine-1',
+        barangayId: 'brgy_176',
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+        name: 'Composter Unit 1',
+        wifiSsid: 'SaganaNet',
+        status: 'active',
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/machines/register')
+        .auth('valid', { type: 'bearer' })
+        .send({
+          name: 'Composter Unit 1',
+          mac_address: 'AA:BB:CC:DD:EE:FF',
+          wifi_ssid: 'SaganaNet',
+        })
+        .expect(201);
+
+      expect(response.body.data).toMatchObject({
+        id: 'new-machine-1',
+        name: 'Composter Unit 1',
+      });
+    });
+
+    it('rejects invalid payload with 400 Bad Request via ZodValidationPipe', async () => {
+      await request(app.getHttpServer())
+        .post('/machines/register')
+        .auth('valid', { type: 'bearer' })
+        .send({
+          name: '',
+          mac_address: 'invalid-mac',
+          wifi_ssid: '',
+        })
+        .expect(400);
+    });
+  });
 });

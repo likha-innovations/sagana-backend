@@ -6,9 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  UsePipes,
 } from '@nestjs/common';
-import { ZodValidationPipe } from 'nestjs-zod';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -16,8 +14,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { MachinesService } from './machines.service';
-import { RegisterMachineDto } from './dto/register-machine.dto';
+import {
+  RegisterMachineSchema,
+  type RegisterMachineDto,
+} from './dto/register-machine.dto';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 
 @ApiTags('Machines')
 @ApiBearerAuth()
@@ -61,10 +63,9 @@ export class MachinesController {
   })
   @ApiResponse({ status: 201, description: 'Machine registered successfully.' })
   @ApiResponse({ status: 409, description: 'MAC address already registered.' })
-  @UsePipes(ZodValidationPipe)
   async register(
     @CurrentUserId() userId: string,
-    @Body() dto: RegisterMachineDto,
+    @Body(new ZodValidationPipe(RegisterMachineSchema)) dto: RegisterMachineDto,
   ) {
     return this.machinesService.register(userId, dto);
   }
