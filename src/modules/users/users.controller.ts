@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { Controller, Get, Patch, Body, UsePipes } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
