@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import type { RegisterMachineDto } from './dto/register-machine.dto';
+import type { UpdateMachineDto } from './dto/update-machine.dto';
 
 @Injectable()
 export class MachinesService {
@@ -45,6 +46,33 @@ export class MachinesService {
     return machine;
   }
 
+  async update(userId: string, id: string, dto: UpdateMachineDto) {
+    const machine = await this.findOne(userId, id);
+    const data: { name?: string; wifiSsid?: string } = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.wifi_ssid !== undefined) data.wifiSsid = dto.wifi_ssid;
+
+    const updated = await this.prisma.machine.update({
+      where: { id: machine.id },
+      data,
+    });
+
+    this.logger.log(`Machine updated: id=${updated.id}`, MachinesService.name);
+    return updated;
+  }
+
+  async remove(userId: string, id: string) {
+    const machine = await this.findOne(userId, id);
+
+    const removed = await this.prisma.machine.update({
+      where: { id: machine.id },
+      data: { removedAt: new Date(), status: 'inactive' },
+    });
+
+    this.logger.log(`Machine removed: id=${removed.id}`, MachinesService.name);
+    return { success: true, message: 'Machine removed successfully' };
+  }
+
   async register(userId: string, dto: RegisterMachineDto) {
     this.logger.log(
       `User ${userId} registering machine MAC=${dto.mac_address}`,
@@ -82,7 +110,12 @@ export class MachinesService {
       // Same barangay — device was re-provisioned (NVS wiped), update credentials
       const machine = await this.prisma.machine.update({
         where: { macAddress: dto.mac_address },
-        data: { name: dto.name, wifiSsid: dto.wifi_ssid, status: 'active' },
+        data: {
+          name: dto.name,
+          wifiSsid: dto.wifi_ssid,
+          status: 'active',
+          removedAt: null,
+        },
       });
 
       this.logger.log(
