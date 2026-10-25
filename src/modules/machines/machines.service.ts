@@ -117,7 +117,7 @@ export class MachinesService {
         );
       }
 
-      // Same barangay — device was re-provisioned (NVS wiped), update credentials
+      // Same barangay: device was re-provisioned (NVS wiped), restore credentials
       const machine = await this.prisma.machine.update({
         where: { macAddress: dto.mac_address },
         data: {
