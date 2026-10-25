@@ -50,7 +50,7 @@ export class TelemetryGateway
     return this.server?.sockets?.sockets?.size || 0;
   }
 
-  // Emits real-time telemetry stream received from HiveMQ to all mobile clients
+  // Emits real-time telemetry stream received from EMQX to all mobile clients
   broadcastTelemetry(data: unknown) {
     if (!this.server) return;
     const payloadStr =
@@ -61,10 +61,10 @@ export class TelemetryGateway
     this.logger.log(`📤 [Socket.IO Emitted] Event 'telemetry': ${payloadStr}`);
   }
 
-  // Receives custom command from mobile client and dispatches it directly to HiveMQ topic
+  // Receives custom command from mobile client and dispatches it to the target device's MQTT topic
   @SubscribeMessage('command')
   async handleCommand(
-    @MessageBody() data: unknown,
+    @MessageBody() data: { macAddress: string; [key: string]: unknown },
     @ConnectedSocket() client: Socket,
   ) {
     const payloadStr =
@@ -74,10 +74,11 @@ export class TelemetryGateway
     this.logger.log(
       `📥 [Socket.IO Received] Event 'command' from client ${client.id}: ${payloadStr}`,
     );
-    await this.mqttService.publish('sagana/commands', data as object);
+    const topic = `sagana/devices/${data.macAddress}/commands`;
+    await this.mqttService.publish(topic, data);
     return {
       status: 'published',
-      topic: 'sagana/commands',
+      topic,
       timestamp: new Date().toISOString(),
     };
   }

@@ -42,19 +42,19 @@ describe('TelemetryGateway', () => {
     expect(mockServer.emit).toHaveBeenCalledWith('telemetry', testData);
   });
 
-  it('should handle command from client and publish to sagana/commands topic', async () => {
-    const mockSocket = {
-      id: 'test-socket-1',
-    } as any;
+  it('should route command to the device-specific MQTT topic', async () => {
+    const mockSocket = { id: 'test-socket-1' } as any;
+    const macAddress = 'AA:BB:CC:DD:EE:FF';
+    const commandPayload = { macAddress, action: 'RELAY_ON' };
 
-    const commandPayload = { action: 'RELAY_ON' };
     const response = await gateway.handleCommand(commandPayload, mockSocket);
+    const expectedTopic = `sagana/devices/${macAddress}/commands`;
 
     expect(mockMqttService.publish).toHaveBeenCalledWith(
-      'sagana/commands',
+      expectedTopic,
       commandPayload,
     );
     expect(response.status).toBe('published');
-    expect(response.topic).toBe('sagana/commands');
+    expect(response.topic).toBe(expectedTopic);
   });
 });

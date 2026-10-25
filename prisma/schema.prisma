@@ -45,11 +45,24 @@ model Machine {
   createdAt  DateTime  @default(now()) @map("created_at")
   removedAt  DateTime? @map("removed_at")
 
-  barangay Barangay       @relation(fields: [barangayId], references: [id])
-  batches  CompostBatch[]
-  sensors  Sensor[]
+  barangay      Barangay       @relation(fields: [barangayId], references: [id])
+  batches       CompostBatch[]
+  sensors       Sensor[]
+  telemetryLogs TelemetryLog[]
 
   @@map("machines")
+}
+
+model TelemetryLog {
+  id         String   @id @default(cuid()) @map("telemetry_id")
+  machineId  String   @map("machine_id")
+  macAddress String   @map("mac_address")
+  payload    Json     @map("payload")
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  machine Machine @relation(fields: [machineId], references: [id])
+
+  @@map("telemetry_logs")
 }
 
 model CompostBatch {

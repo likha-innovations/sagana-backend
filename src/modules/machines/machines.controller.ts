@@ -20,7 +20,10 @@ import {
   RegisterMachineSchema,
   type RegisterMachineDto,
 } from './dto/register-machine.dto';
-import { UpdateMachineSchema, UpdateMachineDto } from './dto/update-machine.dto';
+import {
+  UpdateMachineSchema,
+  UpdateMachineDto,
+} from './dto/update-machine.dto';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 
