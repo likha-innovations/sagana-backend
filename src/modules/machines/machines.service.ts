@@ -2,9 +2,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
+import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
 import type { RegisterMachineDto } from './dto/register-machine.dto';
 import type { UpdateMachineDto } from './dto/update-machine.dto';
 
@@ -13,6 +15,7 @@ export class MachinesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
+    @Optional() private readonly mqttService?: MqttService,
   ) {}
 
   private async getBarangayId(userId: string) {
@@ -56,6 +59,13 @@ export class MachinesService {
       where: { id: machine.id },
       data,
     });
+
+    if (dto.name !== undefined && machine.macAddress && this.mqttService) {
+      await this.mqttService.publish(
+        `sagana/devices/${machine.macAddress}/commands`,
+        { action: 'SET_NAME', name: dto.name },
+      );
+    }
 
     this.logger.log(`Machine updated: id=${updated.id}`, MachinesService.name);
     return updated;

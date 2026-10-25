@@ -70,6 +70,13 @@ export class TelemetryService implements OnModuleInit {
           TelemetryService.name,
         );
 
+        if (isOnline && machine.name) {
+          await this.mqttService.publish(
+            `sagana/devices/${macAddress}/commands`,
+            { action: 'SET_NAME', name: machine.name },
+          );
+        }
+
         this.telemetryGateway.broadcastStatus({
           machineId: machine.id,
           macAddress,
