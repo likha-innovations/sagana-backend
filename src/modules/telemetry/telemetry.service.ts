@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { LoggerService } from '../../core/logger/logger.service';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -114,7 +115,7 @@ export class TelemetryService implements OnModuleInit {
         data: {
           machineId: machine.id,
           macAddress,
-          payload: parsedData,
+          payload: parsedData as Prisma.InputJsonObject,
         },
       });
 
