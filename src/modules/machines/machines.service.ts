@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
+import { TelemetryGateway } from '../telemetry/telemetry.gateway';
 import type { RegisterMachineDto } from './dto/register-machine.dto';
 import type { UpdateMachineDto } from './dto/update-machine.dto';
 
@@ -16,6 +17,7 @@ export class MachinesService {
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
     @Optional() private readonly mqttService?: MqttService,
+    @Optional() private readonly telemetryGateway?: TelemetryGateway,
   ) {}
 
   private async getBarangayId(userId: string) {
@@ -67,6 +69,14 @@ export class MachinesService {
       );
     }
 
+    if (this.telemetryGateway) {
+      this.telemetryGateway.broadcastMachineUpdated({
+        machineId: updated.id,
+        name: updated.name,
+        barangayId: machine.barangayId,
+      });
+    }
+
     this.logger.log(`Machine updated: id=${updated.id}`, MachinesService.name);
     return updated;
   }
@@ -78,6 +88,13 @@ export class MachinesService {
       where: { id: machine.id },
       data: { removedAt: new Date(), status: 'inactive' },
     });
+
+    if (this.telemetryGateway) {
+      this.telemetryGateway.broadcastMachineRemoved({
+        machineId: machine.id,
+        barangayId: machine.barangayId,
+      });
+    }
 
     this.logger.log(`Machine removed: id=${removed.id}`, MachinesService.name);
     return { success: true, message: 'Machine removed successfully' };

@@ -63,6 +63,31 @@ export class TelemetryGateway
     );
   }
 
+  // Emits machine metadata updates to all mobile clients
+  broadcastMachineUpdated(data: {
+    machineId: string;
+    name?: string;
+    barangayId?: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('machine_updated', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'machine_updated': " + JSON.stringify(data),
+    );
+  }
+
+  // Emits machine removal to all mobile clients
+  broadcastMachineRemoved(data: {
+    machineId: string;
+    barangayId?: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('machine_removed', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'machine_removed': " + JSON.stringify(data),
+    );
+  }
+
   // Emits real-time telemetry stream received from EMQX to all mobile clients
   broadcastTelemetry(data: unknown) {
     if (!this.server) return;
