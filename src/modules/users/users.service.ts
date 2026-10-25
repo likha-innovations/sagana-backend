@@ -126,4 +126,13 @@ export class UsersService {
       include: { barangay: true },
     });
   }
+
+  async getOperators() {
+    return this.prisma.user.findMany({
+      where: { role: 'operator' },
+      include: { barangay: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }
+
