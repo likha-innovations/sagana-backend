@@ -5,8 +5,9 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TelemetryGateway } from './telemetry.gateway';
 import { PublishCommandDto } from './dto/publish-command.dto';
 
-// Topic pattern: sagana/devices/<macAddress>/telemetry
+// Topic patterns
 const TELEMETRY_TOPIC_REGEX = /^sagana\/devices\/([^/]+)\/telemetry$/;
+const STATUS_TOPIC_REGEX = /^sagana\/devices\/([^/]+)\/status$/;
 
 @Injectable()
 export class TelemetryService implements OnModuleInit {
@@ -28,10 +29,59 @@ export class TelemetryService implements OnModuleInit {
       const rawString = payload.toString();
       if (!rawString) return;
 
-      const match = TELEMETRY_TOPIC_REGEX.exec(topic);
-      if (!match) return; // ignore non-telemetry topics (e.g. retained system msgs)
+      // 1. Device online / offline status (from LWT or status topic)
+      const statusMatch = STATUS_TOPIC_REGEX.exec(topic);
+      if (statusMatch) {
+        const macAddress = statusMatch[1];
+        let statusData: { status?: string } = {};
+        try {
+          statusData = JSON.parse(rawString) as { status?: string };
+        } catch {
+          statusData = { status: rawString };
+        }
 
-      const macAddress = match[1];
+        const machine = await this.prisma.machine.findUnique({
+          where: { macAddress },
+          select: { id: true, name: true, barangayId: true },
+        });
+
+        if (!machine) {
+          this.logger.warn(
+            `Received status from unknown MAC: ${macAddress}. Ignoring.`,
+            TelemetryService.name,
+          );
+          return;
+        }
+
+        const isOnline = statusData.status === 'online';
+        const machineStatus = isOnline ? 'active' : 'offline';
+
+        await this.prisma.machine.update({
+          where: { macAddress },
+          data: {
+            status: machineStatus,
+            lastSeen: isOnline ? new Date() : undefined,
+          },
+        });
+
+        this.logger.log(
+          `📡 [Device Status] MAC=${macAddress} (id=${machine.id}): ${machineStatus}`,
+          TelemetryService.name,
+        );
+
+        this.telemetryGateway.broadcastStatus({
+          machineId: machine.id,
+          macAddress,
+          status: machineStatus,
+        });
+        return;
+      }
+
+      // 2. Sensor telemetry stream
+      const telemetryMatch = TELEMETRY_TOPIC_REGEX.exec(topic);
+      if (!telemetryMatch) return;
+
+      const macAddress = telemetryMatch[1];
 
       let parsedData: Record<string, unknown> = {};
       try {
@@ -54,10 +104,10 @@ export class TelemetryService implements OnModuleInit {
         return;
       }
 
-      // Update lastSeen timestamp & persist raw telemetry
+      // Update lastSeen timestamp, ensure active status & persist raw telemetry
       await this.prisma.machine.update({
         where: { macAddress },
-        data: { lastSeen: new Date() },
+        data: { lastSeen: new Date(), status: 'active' },
       });
 
       await this.prisma.telemetryLog.create({

@@ -51,6 +51,17 @@ export class TelemetryGateway
   }
 
   // Emits real-time telemetry stream received from EMQX to all mobile clients
+  // Emits device online/offline status changes to all mobile clients
+  broadcastStatus(data: {
+    machineId: string;
+    macAddress: string;
+    status: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('status', data);
+    this.logger.log("📤 [Socket.IO Emitted] Event 'status': " + JSON.stringify(data));
+  }
+
   broadcastTelemetry(data: unknown) {
     if (!this.server) return;
     const payloadStr =
