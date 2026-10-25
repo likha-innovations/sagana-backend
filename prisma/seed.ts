@@ -111,7 +111,7 @@ async function main() {
       name: 'SAGANA-2 (Empty / Idle)',
       macAddress: '00:1A:79:CB:01:02',
       wifiSsid: 'Steler2.4',
-      status: 'active',
+      status: 'offline',
       lastSeen: new Date(Date.now() - 10 * 60 * 1000), // 10 mins ago
     },
     {
@@ -119,7 +119,7 @@ async function main() {
       name: 'SAGANA-4 (No Sensors)',
       macAddress: '00:1A:79:CB:01:04',
       wifiSsid: 'Steler2.4',
-      status: 'active',
+      status: 'offline',
       lastSeen: null, // Never seen
     },
     {
@@ -127,7 +127,7 @@ async function main() {
       name: 'SAGANA-5 (Harvest Ready)',
       macAddress: '00:1A:79:CB:01:05',
       wifiSsid: 'Steler2.4',
-      status: 'active',
+      status: 'offline',
       lastSeen: new Date(Date.now() - 30 * 60 * 1000), // 30 mins ago
     },
   ];

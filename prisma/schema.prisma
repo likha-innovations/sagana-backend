@@ -39,7 +39,7 @@ model Machine {
   barangayId String    @map("barangay_id")
   macAddress String    @unique @map("mac_address")
   name       String
-  status     String    @default("active")
+  status     String    @default("offline")
   wifiSsid   String?   @map("wifi_ssid")
   lastSeen   DateTime? @map("last_seen")
   createdAt  DateTime  @default(now()) @map("created_at")
