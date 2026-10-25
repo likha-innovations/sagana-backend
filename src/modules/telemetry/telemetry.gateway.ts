@@ -63,6 +63,23 @@ export class TelemetryGateway
     );
   }
 
+  // Emits newly registered machine to all mobile clients in the same barangay
+  broadcastMachineAdded(data: {
+    machineId: string;
+    name: string;
+    macAddress: string;
+    barangayId: string;
+    wifiSsid: string | null;
+    status: string;
+    createdAt: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('machine_added', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'machine_added': " + JSON.stringify(data),
+    );
+  }
+
   // Emits machine metadata updates to all mobile clients
   broadcastMachineUpdated(data: {
     machineId: string;
@@ -77,10 +94,7 @@ export class TelemetryGateway
   }
 
   // Emits machine removal to all mobile clients
-  broadcastMachineRemoved(data: {
-    machineId: string;
-    barangayId?: string;
-  }) {
+  broadcastMachineRemoved(data: { machineId: string; barangayId?: string }) {
     if (!this.server) return;
     this.server.emit('machine_removed', data);
     this.logger.log(

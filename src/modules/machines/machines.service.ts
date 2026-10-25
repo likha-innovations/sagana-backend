@@ -145,6 +145,18 @@ export class MachinesService {
         },
       });
 
+      if (this.telemetryGateway) {
+        this.telemetryGateway.broadcastMachineAdded({
+          machineId: machine.id,
+          name: machine.name,
+          macAddress: machine.macAddress,
+          barangayId: machine.barangayId ?? '',
+          wifiSsid: machine.wifiSsid,
+          status: machine.status,
+          createdAt: machine.createdAt.toISOString(),
+        });
+      }
+
       this.logger.log(
         `Machine re-provisioned: id=${machine.id}`,
         MachinesService.name,
@@ -162,6 +174,18 @@ export class MachinesService {
         status: 'active',
       },
     });
+
+    if (this.telemetryGateway) {
+      this.telemetryGateway.broadcastMachineAdded({
+        machineId: machine.id,
+        name: machine.name,
+        macAddress: machine.macAddress,
+        barangayId: machine.barangayId,
+        wifiSsid: machine.wifiSsid,
+        status: machine.status,
+        createdAt: machine.createdAt.toISOString(),
+      });
+    }
 
     this.logger.log(
       `Machine registered: id=${machine.id}`,
