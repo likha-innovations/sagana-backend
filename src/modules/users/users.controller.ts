@@ -3,7 +3,12 @@ import { UsersService } from './users.service';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiBearerAuth()
 @Controller()
@@ -25,7 +30,7 @@ export class UsersController {
   @UsePipes(ZodValidationPipe)
   updateProfile(
     @CurrentUserId() userId: string,
-    @Body() data: UpdateProfileDto
+    @Body() data: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(userId, data);
   }
@@ -33,10 +38,11 @@ export class UsersController {
   @ApiTags('Admin')
   @Get('admin/operators')
   @ApiOperation({ summary: 'Fetch all operator accounts' })
-  @ApiResponse({ status: 200, description: 'Operators retrieved successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Operators retrieved successfully.',
+  })
   getOperators() {
     return this.usersService.getOperators();
   }
 }
-
-
