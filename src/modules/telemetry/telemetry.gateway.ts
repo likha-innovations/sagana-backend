@@ -59,7 +59,9 @@ export class TelemetryGateway
   }) {
     if (!this.server) return;
     this.server.emit('status', data);
-    this.logger.log("📤 [Socket.IO Emitted] Event 'status': " + JSON.stringify(data));
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'status': " + JSON.stringify(data),
+    );
   }
 
   broadcastTelemetry(data: unknown) {
