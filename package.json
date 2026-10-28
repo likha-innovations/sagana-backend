@@ -22,6 +22,7 @@
     "prepare": "husky",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
+    "delete:machines": "ts-node scripts/delete-machines.ts",
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
