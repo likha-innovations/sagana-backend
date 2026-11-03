@@ -1,5 +1,9 @@
 # Backend Agent Directives: sagana-backend
 
+## Property naming
+- Use camelCase for properties in application-owned models, schemas, DTOs, and REST contracts.
+- Preserve required external contract keys, MQTT/WebSocket payloads, and database column names; use Prisma mappings where needed.
+
 ## 1. 🛡️ STRICT PRIVACY & ENVIRONMENT SHIELD (CRITICAL)
 - **NEVER READ `.env` FILES DIRECTLY**: Under no circumstances should any agent open, read, view, or grep `.env`, `.env.local`, `.env.development`, `.env.staging`, `.env.production`, or any file containing live credentials.
 - **Inspect Schemas Only**: When verifying environment variable names, fallback defaults, or configuration shapes, inspect strictly:
