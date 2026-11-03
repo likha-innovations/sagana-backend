@@ -30,7 +30,11 @@ pnpm install
 
 ### 2. Start Development Server
 ```bash
-pnpm run start:dev
+# Standard dev server with watch mode
+pnpm run start
+
+# Or with debug flags
+pnpm run start:debug
 ```
 The server will start on `http://localhost:3000` with hot-reload enabled.
 
@@ -42,6 +46,12 @@ The server will start on `http://localhost:3000` with hot-reload enabled.
 pnpm run docs:dev
 ```
 The documentation hub will open on `http://localhost:5173`.
+
+### 5. Maintenance Scripts
+```bash
+# Hard-delete test/reset machines by MAC address
+pnpm run delete:machines
+```
 
 ---
 

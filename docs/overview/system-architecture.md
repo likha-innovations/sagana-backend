@@ -49,4 +49,10 @@ flowchart TD
    * `database/` — Prisma database client and PostgreSQL connection pool.
    * `mqtt/` — HiveMQ Cloud TLS connection, automatic reconnects, and message dispatching.
 3. **Feature Modules (`src/modules/`)**:
-   Encapsulates domain-specific business logic (`users`, `webhooks`, `telemetry`). Each module owns its own controllers, services, and DTO definitions.
+   Encapsulates domain-specific business logic:
+   * `users/` — User profiles, operator listings, and Clerk synchronization.
+   * `machines/` — Composting hardware management, MAC registration, Wi-Fi pairing, soft-deletion, and downlink name sync.
+   * `feedstocks/` — Organic feedstock catalog and waste categories.
+   * `barangays/` — Local government administrative areas for multi-tenant scoping.
+   * `webhooks/` — Clerk Svix webhook event verification and user DB provisioning.
+   * `telemetry/` — MQTT HiveMQ ingestion, device status tracking, downlink commands, and Socket.IO real-time gateway broadcasting (`/telemetry`).

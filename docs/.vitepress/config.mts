@@ -56,6 +56,9 @@ export default withMermaid(
           collapsed: false,
           items: [
             { text: 'Users & Profile Management', link: '/modules/users' },
+            { text: 'Machines & Hardware Management', link: '/modules/machines' },
+            { text: 'Feedstocks Module', link: '/modules/feedstocks' },
+            { text: 'Barangays Module', link: '/modules/barangays' },
             {
               text: 'Clerk Webhook Synchronization',
               link: '/modules/webhooks',
