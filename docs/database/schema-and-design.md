@@ -33,45 +33,118 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
 ```mermaid
 erDiagram
+    barangays ||--o{ users : "has"
+    barangays ||--o{ machines : "contains"
+    users ||--o{ compost_batches : "operates"
+    machines ||--o{ compost_batches : "runs"
+    machines ||--o{ sensors : "equipped with"
+    machines ||--o{ telemetry_logs : "records"
+    compost_batches ||--o{ batch_feedstocks : "includes"
+    feedstocks ||--o{ batch_feedstocks : "categorizes"
+    compost_batches ||--o| compost_outputs : "yields"
+    compost_batches ||--o{ composting_phases : "progresses through"
+    compost_batches ||--o{ sensor_readings : "captures"
+    sensors ||--o{ sensor_readings : "measures"
+
+    barangays {
+        string id PK "cuid"
+        string name "Barangay name"
+        string status "active"
+        datetime createdAt
+    }
+
     users {
         string id PK "Clerk User ID (user_...)"
-        string fullName "Optional full name"
-        string email UK "Unique email address"
-        string contactNumber "Optional phone number"
-        string location "Optional location"
-        datetime createdAt "Record creation timestamp"
-        datetime updatedAt "Auto-updated timestamp"
+        string barangayId FK
+        string fullName "Optional"
+        datetime birthday "Optional"
+        string email UK
+        string role "operator"
+        string status "active"
+        datetime createdAt
+    }
+
+    machines {
+        string id PK "cuid"
+        string barangayId FK
+        string macAddress UK "Physical MAC"
+        string name "Display name"
+        string status "offline | active"
+        string wifiSsid "Optional"
+        datetime lastSeen
+        datetime createdAt
+        datetime removedAt "Nullable (soft delete)"
+    }
+
+    telemetry_logs {
+        string id PK "cuid"
+        string machineId FK
+        string macAddress
+        json payload "Raw MQTT readings"
+        datetime recordedAt
+    }
+
+    compost_batches {
+        string id PK "cuid"
+        string machineId FK
+        string userId FK
+        float totalWeight "Total biomass kg"
+        string batchCode UK
+        datetime startDate
+        datetime completionDate
+        string status "active | completed"
+    }
+
+    feedstocks {
+        string id PK "cuid"
+        string name "Material name"
+        string category "Green / Brown"
+        string description
+        string status "active"
+    }
+
+    batch_feedstocks {
+        string id PK "cuid"
+        string batchId FK
+        string feedstockId FK
+        float weight "kg"
+    }
+
+    compost_outputs {
+        string id PK "cuid"
+        string batchId FK UK
+        float outputWeight "kg"
+        datetime productionDate
+        datetime collectionDate
+        string status "active"
+    }
+
+    composting_phases {
+        string id PK "cuid"
+        string batchId FK
+        string phaseName "Mesophilic | Thermophilic"
+        datetime startTime
+        datetime endTime
+        string status "active"
+    }
+
+    sensors {
+        string id PK "cuid"
+        string machineId FK
+        string sensorType "temperature | moisture | pH"
+        string location
+        string unit "°C | %"
+        string status "active"
+    }
+
+    sensor_readings {
+        string id PK "cuid"
+        string sensorId FK
+        string batchId FK
+        float value
+        datetime timestamp
     }
 ```
-
-### `User` Model (`users` table)
-
-```prisma
-model User {
-  id            String   @id /// Clerk User ID (user_2bX...)
-  fullName      String?
-  email         String   @unique
-  contactNumber String?
-  location      String?
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("users")
-}
-```
-
-### Fields Description
-
-| Field | Type | Attributes | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | `String` | `@id` | The unique ID assigned by Clerk (`user_...`). Serves as primary key. |
-| `fullName` | `String?` | Optional | User's full name synced from Clerk or updated via `/me`. |
-| `email` | `String` | `@unique` | Primary email address. |
-| `contactNumber` | `String?` | Optional | Phone number synced or updated. |
-| `location` | `String?` | Optional | User's geographical location or city. |
-| `createdAt` | `DateTime` | `@default(now())` | Record creation timestamp. |
-| `updatedAt` | `DateTime` | `@updatedAt` | Automatically updated timestamp. |
 
 ---
 
@@ -86,4 +159,7 @@ pnpm prisma generate
 
 # Open interactive Prisma Studio in browser
 pnpm prisma studio
+
+# Run machine hard-delete maintenance cleanup
+pnpm run delete:machines
 ```
