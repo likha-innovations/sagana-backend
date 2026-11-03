@@ -11,7 +11,8 @@ async function bootstrap() {
     bufferLogs: true,
     rawBody: true,
   });
-  app.useLogger(app.get(LoggerService));
+  const logger = app.get(LoggerService);
+  app.useLogger(logger);
 
   app.enableCors();
 
@@ -30,7 +31,13 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port, '0.0.0.0');
+
+  logger.log(
+    `API documentation available at: http://localhost:${port}/api/docs`,
+    'Bootstrap',
+  );
 }
 
 bootstrap().catch((error) => {

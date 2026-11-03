@@ -2,17 +2,103 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
-import { RegisterMachineDto } from './dto/register-machine.dto';
+import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
+import { TelemetryGateway } from '../telemetry/telemetry.gateway';
+import type { RegisterMachineDto } from './dto/register-machine.dto';
+import type { UpdateMachineDto } from './dto/update-machine.dto';
 
 @Injectable()
 export class MachinesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
+    @Optional() private readonly mqttService?: MqttService,
+    @Optional() private readonly telemetryGateway?: TelemetryGateway,
   ) {}
+
+  private async getBarangayId(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { barangayId: true },
+    });
+    if (!user) {
+      throw new NotFoundException('Authenticated user not found in database');
+    }
+    return user.barangayId;
+  }
+
+  async findAll(userId: string) {
+    const barangayId = await this.getBarangayId(userId);
+    if (!barangayId) return [];
+    return this.prisma.machine.findMany({
+      where: { barangayId, removedAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  async findOne(userId: string, id: string) {
+    const barangayId = await this.getBarangayId(userId);
+    const machine = barangayId
+      ? await this.prisma.machine.findFirst({
+          where: { id, barangayId, removedAt: null },
+        })
+      : null;
+    if (!machine) throw new NotFoundException('Machine not found');
+    return machine;
+  }
+
+  async update(userId: string, id: string, dto: UpdateMachineDto) {
+    const machine = await this.findOne(userId, id);
+    const data: { name?: string; wifiSsid?: string } = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.wifi_ssid !== undefined) data.wifiSsid = dto.wifi_ssid;
+
+    const updated = await this.prisma.machine.update({
+      where: { id: machine.id },
+      data,
+    });
+
+    if (dto.name !== undefined && machine.macAddress && this.mqttService) {
+      await this.mqttService.publish(
+        `sagana/devices/${machine.macAddress}/commands`,
+        { action: 'SET_NAME', name: dto.name },
+      );
+    }
+
+    if (this.telemetryGateway) {
+      this.telemetryGateway.broadcastMachineUpdated({
+        machineId: updated.id,
+        name: updated.name,
+        barangayId: machine.barangayId,
+      });
+    }
+
+    this.logger.log(`Machine updated: id=${updated.id}`, MachinesService.name);
+    return updated;
+  }
+
+  async remove(userId: string, id: string) {
+    const machine = await this.findOne(userId, id);
+
+    const removed = await this.prisma.machine.update({
+      where: { id: machine.id },
+      data: { removedAt: new Date(), status: 'inactive' },
+    });
+
+    if (this.telemetryGateway) {
+      this.telemetryGateway.broadcastMachineRemoved({
+        machineId: machine.id,
+        barangayId: machine.barangayId,
+      });
+    }
+
+    this.logger.log(`Machine removed: id=${removed.id}`, MachinesService.name);
+    return { success: true, message: 'Machine removed successfully' };
+  }
 
   async register(userId: string, dto: RegisterMachineDto) {
     this.logger.log(
@@ -48,11 +134,28 @@ export class MachinesService {
         );
       }
 
-      // Same barangay — device was re-provisioned (NVS wiped), update credentials
+      // Same barangay: device was re-provisioned (NVS wiped), restore credentials
       const machine = await this.prisma.machine.update({
         where: { macAddress: dto.mac_address },
-        data: { name: dto.name, wifiSsid: dto.wifi_ssid, status: 'active' },
+        data: {
+          name: dto.name,
+          wifiSsid: dto.wifi_ssid,
+          status: 'active',
+          removedAt: null,
+        },
       });
+
+      if (this.telemetryGateway) {
+        this.telemetryGateway.broadcastMachineAdded({
+          machineId: machine.id,
+          name: machine.name,
+          macAddress: machine.macAddress,
+          barangayId: machine.barangayId ?? '',
+          wifiSsid: machine.wifiSsid,
+          status: machine.status,
+          createdAt: machine.createdAt.toISOString(),
+        });
+      }
 
       this.logger.log(
         `Machine re-provisioned: id=${machine.id}`,
@@ -71,6 +174,18 @@ export class MachinesService {
         status: 'active',
       },
     });
+
+    if (this.telemetryGateway) {
+      this.telemetryGateway.broadcastMachineAdded({
+        machineId: machine.id,
+        name: machine.name,
+        macAddress: machine.macAddress,
+        barangayId: machine.barangayId,
+        wifiSsid: machine.wifiSsid,
+        status: machine.status,
+        createdAt: machine.createdAt.toISOString(),
+      });
+    }
 
     this.logger.log(
       `Machine registered: id=${machine.id}`,

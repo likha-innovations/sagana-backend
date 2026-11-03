@@ -86,7 +86,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   private subscribeDefaultTopics() {
-    this.subscribe('sagana/stream');
+    this.subscribe('sagana/devices/#');
   }
 
   subscribe(topic: string, qos: mqtt.IClientSubscribeOptions['qos'] = 1) {

@@ -96,7 +96,6 @@ export class UsersService {
   ) {
     this.logger.log(`Updating profile for user ${userId}`, UsersService.name);
 
-    // Ensure user exists before updating
     const user = await this.getProfile(userId);
 
     const updateData: Record<string, unknown> = {};
@@ -124,6 +123,14 @@ export class UsersService {
       where: { id: userId },
       data: updateData,
       include: { barangay: true },
+    });
+  }
+
+  async getOperators() {
+    return this.prisma.user.findMany({
+      where: { role: 'operator' },
+      include: { barangay: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 }

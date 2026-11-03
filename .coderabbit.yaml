@@ -1,0 +1,8 @@
+reviews:
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: true
+    base_branches:
+      - '.*'
+    auto_incremental_review: false

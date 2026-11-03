@@ -11,6 +11,7 @@ import { MqttModule } from './infrastructure/mqtt/mqtt.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { MachinesModule } from './modules/machines/machines.module';
 import { BarangaysModule } from './modules/barangays/barangays.module';
+import { FeedstocksModule } from './modules/feedstocks/feedstocks.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
 
@@ -35,6 +36,7 @@ import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
     WebhooksModule,
     BarangaysModule,
     MachinesModule,
+    FeedstocksModule,
   ],
   controllers: [AppController],
   providers: [

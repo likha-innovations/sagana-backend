@@ -50,7 +50,59 @@ export class TelemetryGateway
     return this.server?.sockets?.sockets?.size || 0;
   }
 
-  // Emits real-time telemetry stream received from HiveMQ to all mobile clients
+  // Emits device online/offline status changes to all mobile clients
+  broadcastStatus(data: {
+    machineId: string;
+    macAddress: string;
+    status: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('status', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'status': " + JSON.stringify(data),
+    );
+  }
+
+  // Emits newly registered machine to all mobile clients in the same barangay
+  broadcastMachineAdded(data: {
+    machineId: string;
+    name: string;
+    macAddress: string;
+    barangayId: string;
+    wifiSsid: string | null;
+    status: string;
+    createdAt: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('machine_added', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'machine_added': " + JSON.stringify(data),
+    );
+  }
+
+  // Emits machine metadata updates to all mobile clients
+  broadcastMachineUpdated(data: {
+    machineId: string;
+    name?: string;
+    barangayId?: string;
+  }) {
+    if (!this.server) return;
+    this.server.emit('machine_updated', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'machine_updated': " + JSON.stringify(data),
+    );
+  }
+
+  // Emits machine removal to all mobile clients
+  broadcastMachineRemoved(data: { machineId: string; barangayId?: string }) {
+    if (!this.server) return;
+    this.server.emit('machine_removed', data);
+    this.logger.log(
+      "📤 [Socket.IO Emitted] Event 'machine_removed': " + JSON.stringify(data),
+    );
+  }
+
+  // Emits real-time telemetry stream received from EMQX to all mobile clients
   broadcastTelemetry(data: unknown) {
     if (!this.server) return;
     const payloadStr =
@@ -61,10 +113,10 @@ export class TelemetryGateway
     this.logger.log(`📤 [Socket.IO Emitted] Event 'telemetry': ${payloadStr}`);
   }
 
-  // Receives custom command from mobile client and dispatches it directly to HiveMQ topic
+  // Receives custom command from mobile client and dispatches it to the target device's MQTT topic
   @SubscribeMessage('command')
   async handleCommand(
-    @MessageBody() data: unknown,
+    @MessageBody() data: { macAddress: string; [key: string]: unknown },
     @ConnectedSocket() client: Socket,
   ) {
     const payloadStr =
@@ -74,10 +126,11 @@ export class TelemetryGateway
     this.logger.log(
       `📥 [Socket.IO Received] Event 'command' from client ${client.id}: ${payloadStr}`,
     );
-    await this.mqttService.publish('sagana/commands', data as object);
+    const topic = `sagana/devices/${data.macAddress}/commands`;
+    await this.mqttService.publish(topic, data);
     return {
       status: 'published',
-      topic: 'sagana/commands',
+      topic,
       timestamp: new Date().toISOString(),
     };
   }

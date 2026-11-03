@@ -10,6 +10,8 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 | :--- | :--- | :--- | :--- |
 | **`GET`** | `/me` | 🔒 Yes | Retrieves the database profile for the currently logged-in user. |
 | **`PATCH`** | `/me` | 🔒 Yes | Partially updates profile fields (`fullName`, `contactNumber`, `location`). |
+| **`GET`** | `/admin/operators` | 🔒 Yes | Retrieves all operator accounts with barangay relations. |
+
 
 ::: info 🛡️ Protected Routes Information
 * **Global Guard**: Protected endpoints require authentication enforced globally by [`ClerkAuthGuard`](../../src/core/guards/clerk-auth.guard.ts).
@@ -72,3 +74,34 @@ Updates user profile fields with Zod validation.
   }
   ```
 * **Success Response (200 OK):** Returns the updated user record inside the standard success envelope.
+
+---
+
+### 3. `GET /admin/operators`
+Retrieves all operator accounts stored in PostgreSQL with their associated barangay details.
+
+* **Headers:** `Authorization: Bearer <clerk_session_token>`
+* **Success Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": "user_2xABC123456",
+        "barangayId": "cm123...",
+        "fullName": "Juan Dela Cruz",
+        "birthday": "1995-05-15T00:00:00.000Z",
+        "email": "juan@example.com",
+        "role": "operator",
+        "status": "active",
+        "createdAt": "2026-08-17T11:00:00.000Z",
+        "barangay": {
+          "id": "cm123...",
+          "name": "Barangay San Antonio"
+        }
+      }
+    ],
+    "timestamp": "2026-10-25T14:40:00.000Z"
+  }
+  ```
+
