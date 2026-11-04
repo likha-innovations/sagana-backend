@@ -8,6 +8,8 @@ The **Machines Module** manages AIVSP composting hardware units, device registra
 
 All machine endpoints require authentication and are scoped to the authenticated operator's assigned barangay.
 
+Machine request and response properties use camelCase. Registration requires `macAddress` and `wifiSsid`; older clients sending `mac_address` and `wifi_ssid` must update. Database column mappings and real-time event payloads are unchanged.
+
 | Method | Endpoint | Protected | Description |
 | :--- | :--- | :---: | :--- |
 | **`GET`** | `/machines` | 🔒 Yes | Lists all non-removed machines in the user's barangay. |
@@ -63,17 +65,17 @@ Registers an AIVSP machine using its physical hardware MAC address and initial W
 * **Request Body Schema (`RegisterMachineDto`):**
   ```typescript
   {
-    mac_address: string; // Valid MAC format (XX:XX:XX:XX:XX:XX)
+    macAddress: string; // Valid MAC format (XX:XX:XX:XX:XX:XX)
     name: string;        // 1-50 characters
-    wifi_ssid?: string;  // Optional Wi-Fi SSID
+    wifiSsid: string;   // Required Wi-Fi SSID
   }
   ```
 * **Sample Request Body:**
   ```json
   {
-    "mac_address": "20:50:0D:E6:C0:3C",
+    "macAddress": "20:50:0D:E6:C0:3C",
     "name": "Composter Unit 1",
-    "wifi_ssid": "Community-Mesh"
+    "wifiSsid": "Community-Mesh"
   }
   ```
 * **Success Response (201 Created):** Returns the created machine entity.
@@ -91,7 +93,7 @@ Updates machine name or Wi-Fi SSID.
   ```typescript
   {
     name?: string;      // 1-50 characters
-    wifi_ssid?: string; // Optional
+    wifiSsid?: string; // Optional
   }
   ```
 * **Downlink Hardware Sync:** When `name` is changed, backend immediately publishes an MQTT command to `sagana/devices/<macAddress>/commands`:

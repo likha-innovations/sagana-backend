@@ -163,8 +163,8 @@ describe('Machine read access', () => {
         .auth('valid', { type: 'bearer' })
         .send({
           name: 'Composter Unit 1',
-          mac_address: 'AA:BB:CC:DD:EE:FF',
-          wifi_ssid: 'SaganaNet',
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          wifiSsid: 'SaganaNet',
         })
         .expect(201);
 
@@ -180,10 +180,29 @@ describe('Machine read access', () => {
         .auth('valid', { type: 'bearer' })
         .send({
           name: '',
-          mac_address: 'invalid-mac',
-          wifi_ssid: '',
+          macAddress: 'invalid-mac',
+          wifiSsid: '',
         })
         .expect(400);
     });
+  });
+
+  it('updates Wi-Fi using camelCase and rejects an empty update', async () => {
+    prisma.machine.update.mockResolvedValue({ ...machines[0], wifiSsid: 'NewNet' });
+    const response = await request(app.getHttpServer())
+      .patch('/machines/neo2')
+      .auth('valid', { type: 'bearer' })
+      .send({ wifiSsid: 'NewNet' })
+      .expect(200);
+    expect(response.body.data.wifiSsid).toBe('NewNet');
+    expect(prisma.machine.update).toHaveBeenCalledWith({
+      where: { id: 'neo2' },
+      data: { wifiSsid: 'NewNet' },
+    });
+    await request(app.getHttpServer())
+      .patch('/machines/neo2')
+      .auth('valid', { type: 'bearer' })
+      .send({ wifiSsid: '' })
+      .expect(400);
   });
 });

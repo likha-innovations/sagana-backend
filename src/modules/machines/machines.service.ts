@@ -55,7 +55,7 @@ export class MachinesService {
     const machine = await this.findOne(userId, id);
     const data: { name?: string; wifiSsid?: string } = {};
     if (dto.name !== undefined) data.name = dto.name;
-    if (dto.wifi_ssid !== undefined) data.wifiSsid = dto.wifi_ssid;
+    if (dto.wifiSsid !== undefined) data.wifiSsid = dto.wifiSsid;
 
     const updated = await this.prisma.machine.update({
       where: { id: machine.id },
@@ -102,7 +102,7 @@ export class MachinesService {
 
   async register(userId: string, dto: RegisterMachineDto) {
     this.logger.log(
-      `User ${userId} registering machine MAC=${dto.mac_address}`,
+      `User ${userId} registering machine MAC=${dto.macAddress}`,
       MachinesService.name,
     );
 
@@ -124,7 +124,7 @@ export class MachinesService {
 
     // 2. Check for duplicate MAC
     const existing = await this.prisma.machine.findUnique({
-      where: { macAddress: dto.mac_address },
+      where: { macAddress: dto.macAddress },
     });
 
     if (existing) {
@@ -136,10 +136,10 @@ export class MachinesService {
 
       // Same barangay: device was re-provisioned (NVS wiped), restore credentials
       const machine = await this.prisma.machine.update({
-        where: { macAddress: dto.mac_address },
+        where: { macAddress: dto.macAddress },
         data: {
           name: dto.name,
-          wifiSsid: dto.wifi_ssid,
+          wifiSsid: dto.wifiSsid,
           status: 'active',
           removedAt: null,
         },
@@ -168,9 +168,9 @@ export class MachinesService {
     const machine = await this.prisma.machine.create({
       data: {
         barangayId: user.barangayId,
-        macAddress: dto.mac_address,
+        macAddress: dto.macAddress,
         name: dto.name,
-        wifiSsid: dto.wifi_ssid,
+        wifiSsid: dto.wifiSsid,
         status: 'active',
       },
     });
