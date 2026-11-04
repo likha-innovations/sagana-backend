@@ -17,12 +17,21 @@ export class TelemetryController {
   constructor(private readonly telemetryService: TelemetryService) {}
 
   @Post('devices/:deviceId/command')
-  @ApiOperation({ summary: 'Send an MQTT command down to an IoT device' })
-  @ApiParam({ name: 'deviceId', description: 'IoT Device ID' })
+  @ApiOperation({
+    summary: 'Publish a device command',
+    description:
+      'Publishes the supplied action and optional payload to the MQTT command topic. Success indicates dispatch to the broker, not confirmation from the device.',
+  })
+  @ApiParam({
+    name: 'deviceId',
+    description: 'Device MAC address used in its MQTT topic.',
+  })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'Command dispatched to MQTT broker successfully.',
   })
+  @ApiResponse({ status: 400, description: 'Invalid command.' })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
   @UsePipes(ZodValidationPipe)
   sendCommand(
     @Param('deviceId') deviceId: string,
