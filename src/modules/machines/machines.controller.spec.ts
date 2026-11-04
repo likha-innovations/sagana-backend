@@ -188,7 +188,10 @@ describe('Machine read access', () => {
   });
 
   it('updates Wi-Fi using camelCase and rejects an empty update', async () => {
-    prisma.machine.update.mockResolvedValue({ ...machines[0], wifiSsid: 'NewNet' });
+    prisma.machine.update.mockResolvedValue({
+      ...machines[0],
+      wifiSsid: 'NewNet',
+    });
     const response = await request(app.getHttpServer())
       .patch('/machines/neo2')
       .auth('valid', { type: 'bearer' })

@@ -23,7 +23,12 @@ export class WebhooksController {
 
   @Post('clerk')
   @ApiOperation({ summary: 'Handle Clerk Webhook Events' })
-  @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
+  @ApiResponse({ status: 201, description: 'Webhook processed successfully.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Missing webhook headers or raw body, invalid signature, or webhook secret unavailable.',
+  })
   async handleClerkWebhook(
     @Req() req: Request,
     @Headers('svix-id') svixId: string,

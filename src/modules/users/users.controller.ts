@@ -19,6 +19,8 @@ export class UsersController {
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully.' })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 404, description: 'User profile not found.' })
   getProfile(@CurrentUserId() userId: string) {
     return this.usersService.getProfile(userId);
   }
@@ -27,6 +29,9 @@ export class UsersController {
   @Patch('me')
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'Profile updated successfully.' })
+  @ApiResponse({ status: 400, description: 'Invalid profile fields.' })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiResponse({ status: 404, description: 'User profile not found.' })
   @UsePipes(ZodValidationPipe)
   updateProfile(
     @CurrentUserId() userId: string,
@@ -42,6 +47,7 @@ export class UsersController {
     status: 200,
     description: 'Operators retrieved successfully.',
   })
+  @ApiResponse({ status: 401, description: 'Authentication required.' })
   getOperators() {
     return this.usersService.getOperators();
   }
