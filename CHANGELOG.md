@@ -52,3 +52,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Svix webhook ingestion endpoint (`POST /webhooks/clerk`) for user lifecycle synchronization.
 - **Barangay Scoping**: `GET /barangays` public directory endpoint and barangay-scoped access controls.
 - **Developer Tooling**: Swagger UI documentation (`/api/docs`), Compodoc schemas, structured `LoggerService`, and global exception filters with standardized response envelopes.
+
