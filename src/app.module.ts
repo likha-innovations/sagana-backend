@@ -14,6 +14,7 @@ import { BarangaysModule } from './modules/barangays/barangays.module';
 import { FeedstocksModule } from './modules/feedstocks/feedstocks.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
+import { BatchesModule } from './modules/batches/batches.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
     BarangaysModule,
     MachinesModule,
     FeedstocksModule,
+    BatchesModule,
   ],
   controllers: [AppController],
   providers: [
