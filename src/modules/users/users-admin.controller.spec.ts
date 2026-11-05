@@ -114,7 +114,7 @@ describe('Admin authorization', () => {
 
   it('returns only same-barangay operators in the existing response envelope', async () => {
     const response = await request(app.getHttpServer())
-      .get('/admin/operators')
+      .get('/operators')
       .auth('admin', { type: 'bearer' })
       .expect(200);
     expect(response.body.data).toEqual([operators[0]]);
@@ -132,18 +132,24 @@ describe('Admin authorization', () => {
     'denies %s',
     async (userId) => {
       await request(app.getHttpServer())
-        .get('/admin/operators')
+        .get('/operators')
         .auth(userId, { type: 'bearer' })
         .expect(403);
       expect(prisma.user.findMany).not.toHaveBeenCalled();
     },
   );
   it('requires a valid token', async () => {
-    await request(app.getHttpServer()).get('/admin/operators').expect(401);
+    await request(app.getHttpServer()).get('/operators').expect(401);
     await request(app.getHttpServer())
-      .get('/admin/operators')
+      .get('/operators')
       .auth('invalid', { type: 'bearer' })
       .expect(401);
+  });
+  it('does not expose the old admin-prefixed route', async () => {
+    await request(app.getHttpServer())
+      .get('/admin/operators')
+      .auth('admin', { type: 'bearer' })
+      .expect(404);
   });
   it('requires authentication and rate-limits barangay assignment attempts', async () => {
     await request(app.getHttpServer())
@@ -168,7 +174,7 @@ describe('Admin authorization', () => {
       .mocked(verifyToken)
       .mockResolvedValue({ sub: 'operator', role: 'admin' } as never);
     await request(app.getHttpServer())
-      .get('/admin/operators')
+      .get('/operators')
       .auth('operator', { type: 'bearer' })
       .expect(403);
   });

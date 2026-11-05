@@ -70,7 +70,7 @@ export class BarangaysController {
   }
 
   @AdminOnly()
-  @Get('admin/code')
+  @Get('code')
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[Admin] Get barangay code',
@@ -99,7 +99,7 @@ export class BarangaysController {
   }
 
   @AdminOnly()
-  @Post('admin/code/rotate')
+  @Post('code/rotate')
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[Admin] Rotate barangay code',

@@ -18,7 +18,7 @@ import {
 @ApiErrorExample(500, 'Unexpected server error.', 'Internal server error')
 @ApiBearerAuth()
 @AdminOnly()
-@Controller('admin')
+@Controller()
 export class UsersAdminController {
   constructor(private readonly usersService: UsersService) {}
 

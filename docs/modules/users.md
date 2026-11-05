@@ -11,7 +11,7 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 | **`GET`** | `/me` | 🔒 Yes | Retrieves the database profile for the currently logged-in user. |
 | **`PATCH`** | `/me` | 🔒 Yes | Partially updates profile fields (`fullName`, `contactNumber`, `location`). |
 | **`POST`** | `/me/barangay-code` | 🔒 Yes | Validates a barangay code and assigns the barangay to an unassigned account. |
-| **`GET`** | `/admin/operators` | 🔒 Admin | Retrieves operator accounts in the admin's barangay. |
+| **`GET`** | `/operators` | 🔒 Admin | Retrieves operator accounts in the admin's barangay. |
 
 
 ::: info 🛡️ Protected Routes Information
@@ -81,7 +81,7 @@ Updates user profile fields with Zod validation.
 
 ---
 
-### 3. `GET /admin/operators`
+### 3. `GET /operators`
 Retrieves operator accounts in the authenticated admin's assigned barangay. An admin role and barangay assignment are required.
 
 * **Headers:** `Authorization: Bearer <clerk_session_token>`
