@@ -20,9 +20,6 @@ features:
   - icon: 🛡️
     title: Clerk-Driven Authentication
     details: Complete JWT verification lifecycle, global route protection, and easy @Public / @CurrentUserId decorators.
-  - icon: 🔄
-    title: Real-Time Webhook Sync
-    details: Cryptographic Svix signature validation for incoming Clerk user events with PostgreSQL upsert/delete handlers.
   - icon: 💎
     title: Type Safety & Validation
     details: Unified Zod v4 schemas for request payloads, environment variables, and Prisma client generation.

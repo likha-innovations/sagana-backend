@@ -32,7 +32,6 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   CLERK_SECRET_KEY: z.string().startsWith('sk_'),
   CLERK_PUBLISHABLE_KEY: z.string().startsWith('pk_'),
-  CLERK_WEBHOOK_SECRET: z.string().optional(),
   PORT: z.coerce.number().default(3000),
 });
 ```

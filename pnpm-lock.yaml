@@ -56,9 +56,6 @@ importers:
       socket.io:
         specifier: ^4.8.3
         version: 4.8.3
-      svix:
-        specifier: ^1.99.1
-        version: 1.99.1
       swagger-ui-express:
         specifier: ^5.0.1
         version: 5.0.1(express@5.2.1)
@@ -5279,9 +5276,6 @@ packages:
 
   svg-pan-zoom@3.6.2:
     resolution: {integrity: sha512-JwnvRWfVKw/Xzfe6jriFyfey/lWJLq4bUh2jwoR5ChWQuQoOH8FEh1l/bEp46iHHKHEJWIyFJETbazraxNWECg==}
-
-  svix@1.99.1:
-    resolution: {integrity: sha512-JfpvbAg5iT5NagDAfOq3e6Ci6NbOMbMm6C3DnfDBB60m2JDK+Z2hXPE9XNAmutb53DCdPoih1V70IbklZnX09A==}
 
   swagger-ui-dist@5.32.12:
     resolution: {integrity: sha512-ceXE+KNc5LXafhh36trB6nxK+U2EIKUWzHT7sBiMosf2eJLAefalYnTwMouQBmSyED6m7Yz+GYZEcL+Glt3sww==}
@@ -11581,10 +11575,6 @@ snapshots:
       has-flag: 4.0.0
 
   svg-pan-zoom@3.6.2: {}
-
-  svix@1.99.1:
-    dependencies:
-      standardwebhooks: 1.0.0
 
   swagger-ui-dist@5.32.12:
     dependencies:

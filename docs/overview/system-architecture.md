@@ -10,7 +10,7 @@ Every incoming HTTP request travels through a unified pipeline of guards, interc
 
 ```mermaid
 flowchart TD
-    Client["📱 Client App (Mobile / Web / Webhook)"] --> Middleware["1. CORS & Raw Body Middleware"]
+    Client["📱 Client App (Mobile / Web)"] --> Middleware["1. CORS Middleware"]
     Middleware --> Throttler["2. ThrottlerGuard (Rate Limit: 100 req/min)"]
     Throttler --> Auth["3. ClerkAuthGuard (JWT Verification)"]
     Auth --> Validation["4. ZodValidationPipe (DTO Parsing)"]
@@ -54,5 +54,4 @@ flowchart TD
    * `machines/` — Composting hardware management, MAC registration, Wi-Fi pairing, soft-deletion, and downlink name sync.
    * `feedstocks/` — Organic feedstock catalog and waste categories.
    * `barangays/` — Local government administrative areas for multi-tenant scoping.
-   * `webhooks/` — Clerk Svix webhook event verification and user DB provisioning.
    * `telemetry/` — MQTT HiveMQ ingestion, device status tracking, downlink commands, and Socket.IO real-time gateway broadcasting (`/telemetry`).

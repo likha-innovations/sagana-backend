@@ -32,7 +32,7 @@ The database schema includes compost batches and sensor data. Batch management e
 
 ## Features
 
-- **Authentication and profiles:** Verify Clerk tokens, retrieve and update user profiles, and synchronize users through Clerk webhooks.
+- **Authentication and profiles:** Verify Clerk tokens and retrieve and update user profiles.
 - **Barangays and feedstocks:** Provide barangay and active feedstock data to clients.
 - **Machine management:** Register, retrieve, update, and soft-remove machines. Machine reads are scoped to the authenticated user's barangay.
 - **Telemetry and commands:** Receive device status and sensor messages over MQTT, store telemetry, and send commands to devices.

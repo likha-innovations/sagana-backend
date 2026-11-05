@@ -60,10 +60,6 @@ export default withMermaid(
             { text: 'Feedstocks Module', link: '/modules/feedstocks' },
             { text: 'Barangays Module', link: '/modules/barangays' },
             {
-              text: 'Clerk Webhook Synchronization',
-              link: '/modules/webhooks',
-            },
-            {
               text: 'Telemetry & IoT (HiveMQ MQTT)',
               link: '/modules/telemetry',
             },

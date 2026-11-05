@@ -13,7 +13,6 @@ DATABASE_URL="postgresql://user:password@ep-sample-pooler.neon.tech/neondb?sslmo
 # Clerk Authentication API Keys
 CLERK_SECRET_KEY="sk_test_..."
 CLERK_PUBLISHABLE_KEY="pk_test_..."
-CLERK_WEBHOOK_SECRET="whsec_..."
 
 # Server Port
 PORT=3000
@@ -62,7 +61,6 @@ The repository contains pre-configured [Bruno](https://www.usebruno.com/) reques
 ```
 bruno/
 ├── auth/
-│   └── Clerk Webhook (Create User).bru
 ├── system/
 │   └── Health Check.bru
 └── users/

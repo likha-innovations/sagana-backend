@@ -24,10 +24,10 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
   - `src/infrastructure/`:
     - Database module & Prisma client service (`PrismaService` with `@prisma/adapter-pg`).
     - MQTT module (`MqttService` managing broker connection, topic subscriptions, and publishing commands).
-  - `src/modules/`: Feature modules (`users`, `webhooks`, `telemetry`).
+  - `src/modules/`: Feature modules (`users`, `machines`, `telemetry`).
 - **Authentication & Security**:
   - Global `ClerkAuthGuard` enforced via `APP_GUARD`.
-  - Use `@Public()` decorator to bypass auth (e.g., Clerk webhooks, health checks).
+  - Use `@Public()` decorator to bypass auth (e.g., health checks).
   - Use `@CurrentUserId()` decorator to extract Clerk user ID from authenticated requests.
   - Global rate limiting: `ThrottlerModule` (100 req / 60s window).
 - **Validation & DTOs**:
@@ -54,8 +54,6 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
 - **Users (`/me`)**:
   - `GET /me` — Returns authenticated user profile (auto-syncs from Clerk if not yet in database).
   - `PATCH /me` — Updates `fullName`, `contactNumber`, and `location` using `UpdateProfileDto`.
-- **Webhooks (`/webhooks/clerk`)**:
-  - `POST /webhooks/clerk` — Public endpoint verifying Svix signatures to handle Clerk events (`user.created`, `user.updated`, `user.deleted`) and sync with PostgreSQL.
 - **Telemetry & IoT (`/telemetry`)**:
   - `POST /telemetry/devices/:deviceId/command` — Dispatches MQTT control command to `sagana/devices/:deviceId/commands`.
   - **Socket.IO `/telemetry` Namespace & MQTT Bridge**:
