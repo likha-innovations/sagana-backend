@@ -1,4 +1,13 @@
-import { Controller, Get, Patch, Body, UsePipes } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Body,
+  UsePipes,
+  UseGuards,
+} from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -38,5 +47,15 @@ export class UsersOperatorController {
     @Body() data: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(userId, data);
+  }
+
+  @Post('me/barangay-code')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  assignBarangay(
+    @CurrentUserId() userId: string,
+    @Body() body: { code?: unknown },
+  ) {
+    return this.usersService.assignBarangay(userId, body?.code);
   }
 }

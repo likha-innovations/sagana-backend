@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,6 +8,11 @@ import {
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { createClerkClient } from '@clerk/backend';
+import { normalizeBarangayCode } from '../barangays/barangay-code';
+
+const barangayProfile = {
+  select: { id: true, name: true, status: true, createdAt: true },
+} as const;
 
 @Injectable()
 export class UsersService {
@@ -18,7 +25,7 @@ export class UsersService {
     this.logger.log(`Fetching profile for user ${userId}`, UsersService.name);
     let user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { barangay: true },
+      include: { barangay: barangayProfile },
     });
 
     if (!user) {
@@ -45,10 +52,6 @@ export class UsersService {
           unsafeMetadata.birthday) as string | null;
         const birthday = birthdayRaw ? new Date(birthdayRaw) : null;
 
-        const rawBarangay = (publicMetadata.barangay ||
-          unsafeMetadata.barangay) as string | null;
-        const barangayId = rawBarangay?.trim() ? rawBarangay.trim() : null;
-
         const status = (publicMetadata.status ||
           unsafeMetadata.status ||
           'active') as string;
@@ -59,7 +62,6 @@ export class UsersService {
             fullName,
             email,
             birthday,
-            barangayId,
             status,
           },
           create: {
@@ -67,10 +69,9 @@ export class UsersService {
             fullName,
             email,
             birthday,
-            barangayId,
             status,
           },
-          include: { barangay: true },
+          include: { barangay: barangayProfile },
         });
       } catch (err) {
         this.logger.warn(
@@ -121,7 +122,7 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id: userId },
       data: updateData,
-      include: { barangay: true },
+      include: { barangay: barangayProfile },
     });
   }
 
@@ -134,8 +135,33 @@ export class UsersService {
       throw new ForbiddenException('Admin barangay required');
     return this.prisma.user.findMany({
       where: { role: 'operator', barangayId: user.barangayId },
-      include: { barangay: true },
+      include: { barangay: barangayProfile },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async assignBarangay(userId: string, input: unknown) {
+    const code = normalizeBarangayCode(input);
+    await this.getProfile(userId);
+    return this.prisma.$transaction(async (tx) => {
+      const [barangay] = await tx.$queryRaw<{ id: string; name: string }[]>`
+        SELECT barangay_id AS id, name FROM barangays
+        WHERE code = ${code} AND status = 'active' FOR SHARE
+      `;
+      if (!barangay) throw new BadRequestException('Invalid barangay code');
+      const updated = await tx.user.updateMany({
+        where: { id: userId, barangayId: null },
+        data: { barangayId: barangay.id },
+      });
+      if (!updated.count) {
+        const current = await tx.user.findUnique({
+          where: { id: userId },
+          select: { barangayId: true },
+        });
+        if (current?.barangayId !== barangay.id)
+          throw new ConflictException('Barangay already assigned');
+      }
+      return barangay;
     });
   }
 }
