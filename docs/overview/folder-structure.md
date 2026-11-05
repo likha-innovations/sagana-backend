@@ -92,12 +92,9 @@ src/modules/
 ├── users/
 │   ├── dto/
 │   │   └── update-profile.dto.ts   # Zod schema & DTO for profile updates
-│   ├── users.controller.ts         # Handlers for /me (GET, PATCH) & admin operators
+│   ├── users-operator.controller.ts # Handlers for /me (GET, PATCH)
+│   ├── users-admin.controller.ts   # Admin operator management handlers
 │   ├── users.service.ts            # User queries and updates via Prisma
 │   ├── users.module.ts             # Module definition
 │   └── *.spec.ts                   # Unit tests
-└── webhooks/
-    ├── webhooks.controller.ts      # Clerk Svix webhook receiver & DB syncer
-    ├── webhooks.module.ts          # Webhooks module definition
-    └── *.spec.ts                   # Webhook tests
 ```
