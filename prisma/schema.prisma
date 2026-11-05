@@ -9,6 +9,7 @@ datasource db {
 model Barangay {
   id        String   @id @default(cuid()) @map("barangay_id")
   name      String
+  code      String?  @unique
   status    String   @default("active")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -26,6 +27,7 @@ model User {
   email      String    @unique
   role       String    @default("operator")
   status     String    @default("active")
+  verificationStatus String @default("unverified") @map("verification_status")
   createdAt  DateTime  @default(now()) @map("created_at")
 
   barangay Barangay?      @relation(fields: [barangayId], references: [id])
