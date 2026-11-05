@@ -9,7 +9,6 @@ import { cleanupOpenApiDoc } from 'nestjs-zod';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
-    rawBody: true,
   });
   const logger = app.get(LoggerService);
   app.useLogger(logger);

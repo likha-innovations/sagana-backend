@@ -10,7 +10,7 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 | :--- | :--- | :--- | :--- |
 | **`GET`** | `/me` | 🔒 Yes | Retrieves the database profile for the currently logged-in user. |
 | **`PATCH`** | `/me` | 🔒 Yes | Partially updates profile fields (`fullName`, `contactNumber`, `location`). |
-| **`GET`** | `/admin/operators` | 🔒 Yes | Retrieves all operator accounts with barangay relations. |
+| **`GET`** | `/admin/operators` | 🔒 Admin | Retrieves operator accounts in the admin's barangay. |
 
 
 ::: info 🛡️ Protected Routes Information
@@ -21,7 +21,7 @@ The **Users Module** manages user identity data within the local PostgreSQL data
   ```
 * **Request Context**: Once verified, the decoded Clerk user ID (`sub`) is automatically attached to `request.user.id` for downstream services.
 * **Unauthorized Access**: Requests with missing, expired, or malformed tokens will immediately receive a `401 Unauthorized` response.
-* **Public Endpoints**: Only endpoints explicitly decorated with `@Public()` (such as webhooks or public health checks) bypass authentication.
+* **Public Endpoints**: Only endpoints explicitly decorated with `@Public()` (such as public health checks) bypass authentication.
 :::
 
 ---
@@ -49,7 +49,7 @@ Retrieves user information associated with the authenticated Clerk User ID.
   }
   ```
 * **Error Response (404 Not Found):**
-  Returned if the user exists in Clerk but has not yet synced to the PostgreSQL database via webhooks.
+  Returned if the profile cannot be retrieved from the database or synchronized from Clerk.
 
 ---
 
@@ -78,7 +78,7 @@ Updates user profile fields with Zod validation.
 ---
 
 ### 3. `GET /admin/operators`
-Retrieves all operator accounts stored in PostgreSQL with their associated barangay details.
+Retrieves operator accounts in the authenticated admin's assigned barangay. An admin role and barangay assignment are required.
 
 * **Headers:** `Authorization: Bearer <clerk_session_token>`
 * **Success Response (200 OK):**

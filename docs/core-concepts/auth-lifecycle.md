@@ -47,7 +47,7 @@ flowchart TD
 ## 🏷️ Custom Decorators
 
 ### 1. `@Public()`
-Bypasses the global `ClerkAuthGuard`. Use this for health checks, public info, and webhook endpoints.
+Bypasses the global `ClerkAuthGuard`. Use this for health checks and public info.
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';

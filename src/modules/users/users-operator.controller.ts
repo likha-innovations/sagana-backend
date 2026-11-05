@@ -12,7 +12,7 @@ import {
 
 @ApiBearerAuth()
 @Controller()
-export class UsersController {
+export class UsersOperatorController {
   constructor(private readonly usersService: UsersService) {}
 
   @ApiTags('Users (Profile)')
@@ -38,17 +38,5 @@ export class UsersController {
     @Body() data: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(userId, data);
-  }
-
-  @ApiTags('Admin')
-  @Get('admin/operators')
-  @ApiOperation({ summary: 'Fetch all operator accounts' })
-  @ApiResponse({
-    status: 200,
-    description: 'Operators retrieved successfully.',
-  })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  getOperators() {
-    return this.usersService.getOperators();
   }
 }

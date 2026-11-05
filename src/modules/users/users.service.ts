@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { createClerkClient } from '@clerk/backend';
@@ -45,9 +49,6 @@ export class UsersService {
           unsafeMetadata.barangay) as string | null;
         const barangayId = rawBarangay?.trim() ? rawBarangay.trim() : null;
 
-        const role = (publicMetadata.role ||
-          unsafeMetadata.role ||
-          'operator') as string;
         const status = (publicMetadata.status ||
           unsafeMetadata.status ||
           'active') as string;
@@ -59,7 +60,6 @@ export class UsersService {
             email,
             birthday,
             barangayId,
-            role,
             status,
           },
           create: {
@@ -68,7 +68,6 @@ export class UsersService {
             email,
             birthday,
             barangayId,
-            role,
             status,
           },
           include: { barangay: true },
@@ -126,9 +125,15 @@ export class UsersService {
     });
   }
 
-  async getOperators() {
+  async getOperators(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { barangayId: true },
+    });
+    if (!user?.barangayId)
+      throw new ForbiddenException('Admin barangay required');
     return this.prisma.user.findMany({
-      where: { role: 'operator' },
+      where: { role: 'operator', barangayId: user.barangayId },
       include: { barangay: true },
       orderBy: { createdAt: 'desc' },
     });
