@@ -10,6 +10,14 @@ By default, **every route in the backend is guarded and private**.
 
 The [`ClerkAuthGuard`](../../src/core/guards/clerk-auth.guard.ts) is registered as a global guard in [`AppModule`](../../src/app.module.ts):
 
+Swagger at `/api/docs` labels each endpoint by access:
+
+1. **Public**: `@Public()` bypasses the Clerk guard; no token is required.
+2. **Shared**: a valid Clerk bearer token is required. Admins and operators can call these endpoints, subject to any profile or barangay restrictions described on the operation.
+3. **Admin**: a valid token and `@AdminOnly()` are required. The guard checks the user's stored admin role; some operations also require an assigned barangay.
+
+In Swagger, select **Authorize** and enter a Clerk token to call protected endpoints. Labels and lock icons document the guards; they do not enforce permissions. The telemetry command endpoint currently accepts any valid token without a device ownership or barangay check.
+
 ```typescript
 // app.module.ts
 providers: [

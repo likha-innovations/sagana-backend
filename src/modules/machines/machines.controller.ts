@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -26,8 +28,14 @@ import {
 } from './dto/update-machine.dto';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
+import {
+  ApiErrorExample,
+  machineExample,
+  successExample,
+} from '../../core/swagger/examples';
 
 @ApiTags('Machines')
+@ApiErrorExample(500, 'Unexpected server error.', 'Internal server error')
 @ApiBearerAuth()
 @Controller('machines')
 export class MachinesController {
@@ -35,42 +43,95 @@ export class MachinesController {
 
   @Get()
   @ApiOperation({
-    summary: 'List non-removed machines in the authenticated user barangay',
+    summary: '[Shared] List barangay machines',
+    description:
+      'Returns non-removed machines in the current user’s barangay. Returns an empty list when no barangay is assigned.',
   })
   @ApiResponse({
     status: 200,
     description:
       'Matching machines, or an empty list when no barangay is assigned.',
+    content: {
+      'application/json': { example: successExample([machineExample]) },
+    },
   })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({ status: 404, description: 'User profile not found.' })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User profile not found.',
+    'Authenticated user not found in database',
+  )
   findAll(@CurrentUserId() userId: string) {
     return this.machinesService.findAll(userId);
   }
 
   @Get(':id')
   @ApiOperation({
-    summary: 'Get a non-removed machine in the authenticated user barangay',
+    summary: '[Shared] Get a machine',
+    description:
+      'Returns a non-removed machine in the current user’s barangay.',
   })
-  @ApiResponse({ status: 200, description: 'Machine found.' })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiParam({ name: 'id', description: 'Machine ID', example: 'machine123' })
   @ApiResponse({
-    status: 404,
-    description: 'User or accessible machine not found.',
+    status: 200,
+    description: 'Machine found.',
+    content: {
+      'application/json': { example: successExample(machineExample) },
+    },
   })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
   findOne(@CurrentUserId() userId: string, @Param('id') id: string) {
     return this.machinesService.findOne(userId, id);
   }
 
   @Patch(':id')
   @ApiOperation({
-    summary:
-      'Update machine name or Wi-Fi SSID in the authenticated user barangay',
+    summary: '[Shared] Update a machine',
+    description:
+      'Updates a non-removed machine in the user’s barangay. Supply at least one field; a name change also sends an MQTT command when MQTT is available.',
   })
-  @ApiResponse({ status: 200, description: 'Machine updated successfully.' })
-  @ApiResponse({ status: 400, description: 'Validation error.' })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({ status: 404, description: 'Machine not found.' })
+  @ApiParam({ name: 'id', description: 'Machine ID', example: 'machine123' })
+  @ApiBody({
+    type: UpdateMachineDto,
+    examples: {
+      update: { value: { name: 'Composter 1', wifiSsid: 'SaganaNet' } },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated machine.',
+    content: {
+      'application/json': { example: successExample(machineExample) },
+    },
+  })
+  @ApiErrorExample(
+    400,
+    'Invalid or empty update.',
+    'At least one field (name or wifiSsid) must be provided',
+  )
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
   update(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
@@ -81,11 +142,33 @@ export class MachinesController {
 
   @Delete(':id')
   @ApiOperation({
-    summary: 'Soft-remove a machine in the authenticated user barangay',
+    summary: '[Shared] Remove a machine',
+    description:
+      'Soft-removes a non-removed machine in the user’s barangay and marks it inactive.',
   })
-  @ApiResponse({ status: 200, description: 'Machine removed successfully.' })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({ status: 404, description: 'Machine not found.' })
+  @ApiParam({ name: 'id', description: 'Machine ID', example: 'machine123' })
+  @ApiResponse({
+    status: 200,
+    description: 'Machine removed.',
+    content: {
+      'application/json': {
+        example: successExample({
+          success: true,
+          message: 'Machine removed successfully',
+        }),
+      },
+    },
+  })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
   remove(@CurrentUserId() userId: string, @Param('id') id: string) {
     return this.machinesService.remove(userId, id);
   }
@@ -93,10 +176,52 @@ export class MachinesController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Register a new AIVSP machine to the operator barangay',
+    summary: '[Shared] Register a machine',
+    description:
+      'Registers a machine to the user’s barangay. An existing device in that barangay is re-provisioned; a device assigned to another barangay causes a conflict.',
   })
-  @ApiResponse({ status: 201, description: 'Machine registered successfully.' })
-  @ApiResponse({ status: 409, description: 'MAC address already registered.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['name', 'macAddress', 'wifiSsid'],
+      properties: {
+        name: { type: 'string', minLength: 1, example: 'Composter 1' },
+        macAddress: {
+          type: 'string',
+          description: 'MAC address or UUID device identifier.',
+          example: 'AA:BB:CC:DD:EE:FF',
+        },
+        wifiSsid: { type: 'string', minLength: 1, example: 'SaganaNet' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Machine registered or re-provisioned.',
+    content: {
+      'application/json': { example: successExample(machineExample) },
+    },
+  })
+  @ApiErrorExample(
+    400,
+    'Invalid machine fields.',
+    'Invalid MAC address or device identifier format',
+  )
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or barangay assignment not found.',
+    'User is not associated with a barangay. Contact your administrator.',
+  )
+  @ApiErrorExample(
+    409,
+    'Device belongs to another barangay.',
+    'This machine is already registered to a different barangay.',
+  )
   async register(
     @CurrentUserId() userId: string,
     @Body(new ZodValidationPipe(RegisterMachineSchema)) dto: RegisterMachineDto,

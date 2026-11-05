@@ -8,9 +8,12 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
+import { ApiErrorExample, successExample } from '../../core/swagger/examples';
 
-@ApiTags('Telemetry & IoT')
+@ApiTags('Telemetry')
+@ApiErrorExample(500, 'Unexpected server error.', 'Internal server error')
 @ApiBearerAuth()
 @Controller('telemetry')
 export class TelemetryController {
@@ -18,9 +21,13 @@ export class TelemetryController {
 
   @Post('devices/:deviceId/command')
   @ApiOperation({
-    summary: 'Publish a device command',
+    summary: '[Shared] Send a device command',
     description:
-      'Publishes the supplied action and optional payload to the MQTT command topic. Success indicates dispatch to the broker, not confirmation from the device.',
+      'Publishes the supplied action and optional payload to the MQTT command topic. Success indicates dispatch to the broker, not confirmation from the device. Any valid Clerk token can call this endpoint; it does not check device ownership or barangay.',
+  })
+  @ApiBody({
+    type: PublishCommandDto,
+    examples: { command: { value: { action: 'restart', payload: {} } } },
   })
   @ApiParam({
     name: 'deviceId',
@@ -29,9 +36,23 @@ export class TelemetryController {
   @ApiResponse({
     status: 201,
     description: 'Command dispatched to MQTT broker successfully.',
+    content: {
+      'application/json': {
+        example: successExample({
+          success: true,
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          action: 'restart',
+          timestamp: '2026-10-10T00:00:00.000Z',
+        }),
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'Invalid command.' })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
+  @ApiErrorExample(400, 'Invalid command.', 'Validation failed')
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
   @UsePipes(ZodValidationPipe)
   sendCommand(
     @Param('deviceId') deviceId: string,

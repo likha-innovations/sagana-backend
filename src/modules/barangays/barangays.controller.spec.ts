@@ -57,23 +57,34 @@ describe('Barangay code endpoints', () => {
   });
 
   it('restricts code viewing and rotation to admins', async () => {
-    await request(app.getHttpServer()).get('/barangays/admin/code').expect(401);
+    await request(app.getHttpServer()).get('/barangays/code').expect(401);
     await request(app.getHttpServer())
-      .get('/barangays/admin/code')
+      .get('/barangays/code')
       .auth('operator', { type: 'bearer' })
       .expect(403);
     await request(app.getHttpServer())
-      .post('/barangays/admin/code/rotate')
+      .post('/barangays/code/rotate')
       .auth('operator', { type: 'bearer' })
       .expect(403);
     await request(app.getHttpServer())
-      .get('/barangays/admin/code')
+      .get('/barangays/code')
       .auth('admin', { type: 'bearer' })
       .expect(200, { code: 'ABC123' });
     await request(app.getHttpServer())
-      .post('/barangays/admin/code/rotate')
+      .post('/barangays/code/rotate')
       .auth('admin', { type: 'bearer' })
       .expect(201);
+  });
+
+  it('does not expose the old admin-prefixed routes', async () => {
+    await request(app.getHttpServer())
+      .get('/barangays/admin/code')
+      .auth('admin', { type: 'bearer' })
+      .expect(404);
+    await request(app.getHttpServer())
+      .post('/barangays/admin/code/rotate')
+      .auth('admin', { type: 'bearer' })
+      .expect(404);
   });
 
   it('rate-limits code attempts', async () => {

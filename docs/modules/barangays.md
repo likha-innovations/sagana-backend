@@ -10,8 +10,8 @@ The **Barangays Module** manages local community administrative boundaries, enab
 | :--- | :--- | :---: | :--- |
 | **`GET`** | `/barangays` | 🌐 Public | Lists all active barangays. |
 | **`POST`** | `/barangays/validate-code` | 🌐 Public | Validates a code and returns the barangay ID and name. |
-| **`GET`** | `/barangays/admin/code` | 🔒 Admin | Returns the admin barangay's current code. |
-| **`POST`** | `/barangays/admin/code/rotate` | 🔒 Admin | Rotates the admin barangay's code. |
+| **`GET`** | `/barangays/code` | 🔒 Admin | Returns the admin barangay's current code. |
+| **`POST`** | `/barangays/code/rotate` | 🔒 Admin | Rotates the admin barangay's code. |
 
 Run `pnpm run seed:barangay-codes` with `DATABASE_URL` set after applying the migration. It generates codes only for barangays without one. Existing codes are preserved; the script does not run the general machine-data seed.
 
