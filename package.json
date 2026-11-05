@@ -23,6 +23,7 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "delete:machines": "ts-node scripts/delete-machines.ts",
+    "seed:barangay-codes": "ts-node prisma/seed-barangay-codes.ts",
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {

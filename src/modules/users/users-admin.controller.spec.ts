@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { APP_GUARD } from '@nestjs/core';
 import { verifyToken } from '@clerk/backend';
+import { ThrottlerModule } from '@nestjs/throttler';
 import request from 'supertest';
 import { AppController } from '../../app.controller';
 import { ClerkAuthGuard } from '../../core/guards/clerk-auth.guard';
@@ -77,6 +78,7 @@ describe('Admin authorization', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }])],
       controllers: [
         AppController,
         UsersOperatorController,
@@ -118,7 +120,11 @@ describe('Admin authorization', () => {
     expect(response.body.data).toEqual([operators[0]]);
     expect(prisma.user.findMany).toHaveBeenCalledWith({
       where: { role: 'operator', barangayId: 'b1' },
-      include: { barangay: true },
+      include: {
+        barangay: {
+          select: { id: true, name: true, status: true, createdAt: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   });
@@ -138,6 +144,24 @@ describe('Admin authorization', () => {
       .get('/admin/operators')
       .auth('invalid', { type: 'bearer' })
       .expect(401);
+  });
+  it('requires authentication and rate-limits barangay assignment attempts', async () => {
+    await request(app.getHttpServer())
+      .post('/me/barangay-code')
+      .send({ code: 'bad' })
+      .expect(401);
+    for (let i = 0; i < 10; i++) {
+      await request(app.getHttpServer())
+        .post('/me/barangay-code')
+        .auth('operator', { type: 'bearer' })
+        .send({ code: 'bad' })
+        .expect(400);
+    }
+    await request(app.getHttpServer())
+      .post('/me/barangay-code')
+      .auth('operator', { type: 'bearer' })
+      .send({ code: 'bad' })
+      .expect(429);
   });
   it('does not trust an admin role in the token when the database role is operator', async () => {
     jest

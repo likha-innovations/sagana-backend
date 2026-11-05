@@ -10,6 +10,7 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 | :--- | :--- | :--- | :--- |
 | **`GET`** | `/me` | 🔒 Yes | Retrieves the database profile for the currently logged-in user. |
 | **`PATCH`** | `/me` | 🔒 Yes | Partially updates profile fields (`fullName`, `contactNumber`, `location`). |
+| **`POST`** | `/me/barangay-code` | 🔒 Yes | Validates a barangay code and assigns the barangay to an unassigned account. |
 | **`GET`** | `/admin/operators` | 🔒 Admin | Retrieves operator accounts in the admin's barangay. |
 
 
@@ -30,6 +31,9 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 
 ### 1. `GET /me`
 Retrieves user information associated with the authenticated Clerk User ID.
+
+The returned `verificationStatus` is informational; it does not restrict access.
+The migration marks existing users as `verified`; newly created users default to `unverified`. The separate user seed helper inserts only explicitly supplied users and skips existing records.
 
 * **Headers:** `Authorization: Bearer <clerk_session_token>`
 * **Success Response (200 OK):**

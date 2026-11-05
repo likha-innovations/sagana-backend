@@ -54,7 +54,11 @@ describe('UsersService', () => {
       expect(result).toEqual(mockOperators);
       expect(prismaService.user.findMany).toHaveBeenCalledWith({
         where: { role: 'operator', barangayId: 'brgy_176' },
-        include: { barangay: true },
+        include: {
+          barangay: {
+            select: { id: true, name: true, status: true, createdAt: true },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
     });
@@ -79,8 +83,8 @@ describe('UsersService', () => {
         users: {
           getUser: jest.fn().mockResolvedValue({
             emailAddresses: [{ emailAddress: 'user@example.com' }],
-            publicMetadata: { role: 'admin' },
-            unsafeMetadata: { role: 'admin' },
+            publicMetadata: { role: 'admin', barangay: 'b1' },
+            unsafeMetadata: { role: 'admin', barangay: 'b2' },
             fullName: 'Test User',
             firstName: 'Test',
             lastName: 'User',
@@ -91,6 +95,9 @@ describe('UsersService', () => {
       const args = prismaService.user.upsert.mock.calls[0][0];
       expect(args.create).not.toHaveProperty('role');
       expect(args.update).not.toHaveProperty('role');
+      expect(args.create).not.toHaveProperty('barangayId');
+      expect(args.update).not.toHaveProperty('barangayId');
+      expect(args.include.barangay.select).not.toHaveProperty('code');
     });
   });
 });
