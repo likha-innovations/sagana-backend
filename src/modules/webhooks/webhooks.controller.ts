@@ -4,11 +4,13 @@ import {
   Req,
   Headers,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Webhook } from 'svix';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
+import { TelemetryGateway } from '../telemetry/telemetry.gateway';
 import { Public } from '../../core/decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
@@ -19,6 +21,7 @@ export class WebhooksController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: LoggerService,
+    @Optional() private readonly telemetryGateway?: TelemetryGateway,
   ) {}
 
   @Post('clerk')
@@ -110,12 +113,14 @@ export class WebhooksController {
         `User ${id} successfully synced to Neon database`,
         WebhooksController.name,
       );
+      this.telemetryGateway?.broadcastDashboardUpdate();
     } else if (eventType === 'user.deleted') {
       await this.prisma.user.delete({ where: { id } }).catch(() => {});
       this.logger.log(
         `User ${id} successfully deleted from Neon database`,
         WebhooksController.name,
       );
+      this.telemetryGateway?.broadcastDashboardUpdate();
     }
 
     return { success: true };

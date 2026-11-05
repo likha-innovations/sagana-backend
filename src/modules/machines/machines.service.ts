@@ -34,8 +34,25 @@ export class MachinesService {
   async findAll(userId: string) {
     const barangayId = await this.getBarangayId(userId);
     if (!barangayId) return [];
+
     return this.prisma.machine.findMany({
       where: { barangayId, removedAt: null },
+      include: {
+        barangay: true,
+        batches: {
+          where: { status: 'active' },
+          take: 1,
+          orderBy: { startDate: 'desc' },
+          include: {
+            user: { select: { fullName: true } },
+            compostingPhases: {
+              where: { status: 'active' },
+              take: 1,
+              orderBy: { startTime: 'desc' },
+            },
+          },
+        },
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
   }
@@ -45,6 +62,22 @@ export class MachinesService {
     const machine = barangayId
       ? await this.prisma.machine.findFirst({
           where: { id, barangayId, removedAt: null },
+          include: {
+            barangay: true,
+            batches: {
+              where: { status: 'active' },
+              take: 1,
+              orderBy: { startDate: 'desc' },
+              include: {
+                user: { select: { fullName: true } },
+                compostingPhases: {
+                  where: { status: 'active' },
+                  take: 1,
+                  orderBy: { startTime: 'desc' },
+                },
+              },
+            },
+          },
         })
       : null;
     if (!machine) throw new NotFoundException('Machine not found');
@@ -78,6 +111,7 @@ export class MachinesService {
     }
 
     this.logger.log(`Machine updated: id=${updated.id}`, MachinesService.name);
+    this.telemetryGateway?.broadcastDashboardUpdate();
     return updated;
   }
 
@@ -97,6 +131,7 @@ export class MachinesService {
     }
 
     this.logger.log(`Machine removed: id=${removed.id}`, MachinesService.name);
+    this.telemetryGateway?.broadcastDashboardUpdate();
     return { success: true, message: 'Machine removed successfully' };
   }
 
@@ -161,6 +196,7 @@ export class MachinesService {
         `Machine re-provisioned: id=${machine.id}`,
         MachinesService.name,
       );
+      this.telemetryGateway?.broadcastDashboardUpdate();
       return machine;
     }
 
@@ -191,6 +227,7 @@ export class MachinesService {
       `Machine registered: id=${machine.id}`,
       MachinesService.name,
     );
+    this.telemetryGateway?.broadcastDashboardUpdate();
 
     return machine;
   }

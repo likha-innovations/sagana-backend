@@ -82,6 +82,7 @@ export class TelemetryService implements OnModuleInit {
           macAddress,
           status: machineStatus,
         });
+        this.telemetryGateway.broadcastDashboardUpdate();
         return;
       }
 
@@ -141,6 +142,7 @@ export class TelemetryService implements OnModuleInit {
       );
 
       this.telemetryGateway.broadcastTelemetry(enrichedPayload);
+      this.telemetryGateway.broadcastDashboardUpdate();
     } catch (err) {
       this.logger.error(
         `Failed to process MQTT message from topic ${topic}: ${err instanceof Error ? err.message : err}`,

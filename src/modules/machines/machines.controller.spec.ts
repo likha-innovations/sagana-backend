@@ -55,7 +55,7 @@ describe('Machine read access', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(verifyToken).mockResolvedValue({ sub: 'account' } as never);
+    (verifyToken as jest.Mock).mockResolvedValue({ sub: 'account' });
     prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
   });
 

@@ -14,7 +14,8 @@ import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: true,
+    credentials: true,
   },
   namespace: '/telemetry',
 })
@@ -48,6 +49,15 @@ export class TelemetryGateway
 
   private getClientCount(): number {
     return this.server?.sockets?.sockets?.size || 0;
+  }
+
+  // Emits real-time notification to web console to refresh dashboard metrics
+  broadcastDashboardUpdate() {
+    if (!this.server) return;
+    this.server.emit('dashboard:update', {
+      timestamp: new Date().toISOString(),
+    });
+    this.logger.log("📤 [Socket.IO Emitted] Event 'dashboard:update'");
   }
 
   // Emits device online/offline status changes to all mobile clients

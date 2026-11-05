@@ -5,7 +5,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 export class FeedstocksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  findAll() {
     return this.prisma.feedstock.findMany({
       where: {
         status: 'active',

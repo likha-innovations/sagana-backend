@@ -12,6 +12,7 @@ import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { MachinesModule } from './modules/machines/machines.module';
 import { BarangaysModule } from './modules/barangays/barangays.module';
 import { FeedstocksModule } from './modules/feedstocks/feedstocks.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
 
@@ -37,6 +38,7 @@ import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
     BarangaysModule,
     MachinesModule,
     FeedstocksModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
