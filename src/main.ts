@@ -20,8 +20,18 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Sagana Backend API')
-    .setDescription('The API documentation')
+    .setDescription(
+      "Access labels: Public requires no token; Shared accepts a valid Clerk token; Admin requires an admin account. Some endpoints also restrict data to the user's barangay. Use Authorize to enter a Clerk bearer token.",
+    )
     .setVersion('1.0')
+    .addTag('System')
+    .addTag('Profile')
+    .addTag('Barangays')
+    .addTag('Machines')
+    .addTag('Users')
+    .addTag('Batches')
+    .addTag('Feedstocks')
+    .addTag('Telemetry')
     .addBearerAuth()
     .build();
   const document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, config));

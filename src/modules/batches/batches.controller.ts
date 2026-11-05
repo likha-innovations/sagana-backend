@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 import { BatchesService } from './batches.service';
+import { ApiErrorExample } from '../../core/swagger/examples';
 
 const createSchema = z
   .object({
@@ -51,7 +52,7 @@ const batchExample = {
   id: 'batch123',
   machineId: 'machine123',
   userId: 'user123',
-  batchCode: 'BATCH-123',
+  batchCode: 'BATCH-123e4567-e89b-42d3-a456-426614174000',
   status: 'completed',
   startDate: '2026-10-01T00:00:00.000Z',
   completionDate: '2026-10-10T00:00:00.000Z',
@@ -109,6 +110,7 @@ const response = (data: unknown) => ({
 });
 
 @ApiTags('Batches')
+@ApiErrorExample(500, 'Unexpected server error.', 'Internal server error')
 @ApiBearerAuth()
 @Controller()
 export class BatchesController {
@@ -116,7 +118,7 @@ export class BatchesController {
 
   @Get('batches')
   @ApiOperation({
-    summary: 'List batches for machines in the current user’s barangay',
+    summary: '[Shared] List batches',
     description:
       'Returns feedstocks, phases, and any compost output. A completion date takes precedence over the stored status.',
   })
@@ -125,14 +127,26 @@ export class BatchesController {
     description: 'Batch list, or an empty array if no barangay is assigned.',
     content: { 'application/json': { example: response([batchExample]) } },
   })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({ status: 404, description: 'User profile not found.' })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User profile not found.',
+    'Authenticated user not found',
+  )
   list(@CurrentUserId() userId: string) {
     return this.batches.list(userId);
   }
 
   @Get('batches/:id')
-  @ApiOperation({ summary: 'Get an accessible batch and its recorded details' })
+  @ApiOperation({
+    summary: '[Shared] Get a batch',
+    description:
+      'Returns a batch for a non-removed machine in the user’s barangay.',
+  })
   @ApiParam({ name: 'id', description: 'Batch ID' })
   @ApiResponse({
     status: 200,
@@ -140,22 +154,35 @@ export class BatchesController {
       'Batch with machine name, feedstocks, phases, and optional output.',
     content: { 'application/json': { example: response(batchExample) } },
   })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({
-    status: 404,
-    description: 'User or accessible batch not found.',
-  })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible batch not found.',
+    'Batch not found',
+  )
   get(@CurrentUserId() userId: string, @Param('id') id: string) {
     return this.batches.get(userId, id);
   }
 
   @Post('batches')
   @ApiOperation({
-    summary: 'Start a compost batch',
+    summary: '[Shared] Start a batch',
     description:
       'Creates a batch and its feedstocks together. The machine must belong to the user’s barangay and cannot already have an active batch.',
   })
   @ApiBody({
+    examples: {
+      create: {
+        value: {
+          machineId: 'machine123',
+          feedstocks: [{ id: 'feedstock123', weight: 20 }],
+        },
+      },
+    },
     schema: {
       type: 'object',
       required: ['machineId', 'feedstocks'],
@@ -185,21 +212,38 @@ export class BatchesController {
     status: 201,
     description:
       'Batch created with active status and no completion date or output.',
+    content: {
+      'application/json': {
+        example: response({
+          ...batchExample,
+          status: 'active',
+          completionDate: null,
+          finalWeight: null,
+          compostOutput: null,
+        }),
+      },
+    },
   })
-  @ApiResponse({
-    status: 400,
-    description:
-      'Invalid, duplicate, or inactive feedstocks, or invalid weights.',
-  })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({
-    status: 404,
-    description: 'User or accessible machine not found.',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'The machine already has an active batch.',
-  })
+  @ApiErrorExample(
+    400,
+    'Invalid, duplicate, or inactive feedstocks, or invalid weights.',
+    'Invalid or inactive feedstock',
+  )
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
+  @ApiErrorExample(
+    409,
+    'The machine already has an active batch.',
+    'Machine already has an active batch',
+  )
   create(
     @CurrentUserId() userId: string,
     @Body(new ZodValidationPipe(createSchema))
@@ -210,7 +254,7 @@ export class BatchesController {
 
   @Post('batches/:id/finish')
   @ApiOperation({
-    summary: 'Finish an active batch',
+    summary: '[Shared] Finish a batch',
     description:
       'Records completion. An output record is created only when a measured output weight is supplied.',
   })
@@ -239,16 +283,26 @@ export class BatchesController {
     description: 'Batch finished.',
     content: { 'application/json': { example: response(batchExample) } },
   })
-  @ApiResponse({ status: 400, description: 'Invalid output weight.' })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({
-    status: 404,
-    description: 'User or accessible batch not found.',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'The batch is not active or has already been completed.',
-  })
+  @ApiErrorExample(
+    400,
+    'Invalid output weight.',
+    'Too small: expected number to be >=0',
+  )
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible batch not found.',
+    'Batch not found',
+  )
+  @ApiErrorExample(
+    409,
+    'The batch is not active or has already been completed.',
+    'Batch is not active',
+  )
   finish(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
@@ -260,7 +314,7 @@ export class BatchesController {
 
   @Get('machines/:id/readings')
   @ApiOperation({
-    summary: 'Get recorded sensor history for a machine',
+    summary: '[Shared] Get machine sensor history',
     description:
       'Returns sensor metadata and recorded sensor readings, ordered newest first.',
   })
@@ -292,16 +346,23 @@ export class BatchesController {
   @ApiResponse({
     status: 200,
     description: 'Sensor metadata, readings, and hasMore pagination flag.',
+    content: { 'application/json': { example: response(historyExample) } },
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid date range or pagination.',
-  })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({
-    status: 404,
-    description: 'User or accessible machine not found.',
-  })
+  @ApiErrorExample(
+    400,
+    'Invalid date range or pagination.',
+    'Invalid date range',
+  )
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
   machineReadings(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
@@ -313,7 +374,7 @@ export class BatchesController {
 
   @Get('batches/:id/readings')
   @ApiOperation({
-    summary: 'Get sensor history for a batch',
+    summary: '[Shared] Get batch sensor history',
     description:
       'Returns recorded sensor readings explicitly linked to this batch.',
   })
@@ -347,15 +408,21 @@ export class BatchesController {
     description: 'Sensor metadata, readings, and hasMore pagination flag.',
     content: { 'application/json': { example: response(historyExample) } },
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid date range or pagination.',
-  })
-  @ApiResponse({ status: 401, description: 'Authentication required.' })
-  @ApiResponse({
-    status: 404,
-    description: 'User or accessible batch or machine not found.',
-  })
+  @ApiErrorExample(
+    400,
+    'Invalid date range or pagination.',
+    'Invalid date range',
+  )
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible batch or machine not found.',
+    'Batch not found',
+  )
   batchReadings(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
