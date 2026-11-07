@@ -88,3 +88,22 @@ export class UsersController {
   }
 }
 ```
+
+---
+
+### 3. `@AdminOnly()`
+Restricts endpoint access strictly to users with `role: 'admin'` in the database via [`AdminGuard`](../../src/core/guards/admin.guard.ts). Unassigned or operator users receive a `403 Forbidden` response.
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { AdminOnly } from 'src/core/decorators/admin-only.decorator';
+
+@AdminOnly()
+@Controller()
+export class UsersAdminController {
+  @Get('operators')
+  getOperators() {
+    // Only accessible by verified barangay admins
+  }
+}
+```

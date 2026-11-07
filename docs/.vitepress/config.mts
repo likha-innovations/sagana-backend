@@ -57,6 +57,7 @@ export default withMermaid(
           items: [
             { text: 'Users & Profile Management', link: '/modules/users' },
             { text: 'Machines & Hardware Management', link: '/modules/machines' },
+            { text: 'Batches & Sensor History', link: '/modules/batches' },
             { text: 'Feedstocks Module', link: '/modules/feedstocks' },
             { text: 'Barangays Module', link: '/modules/barangays' },
             {

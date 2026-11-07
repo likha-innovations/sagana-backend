@@ -52,6 +52,7 @@ flowchart TD
    Encapsulates domain-specific business logic:
    * `users/` — User profiles, operator listings, and Clerk synchronization.
    * `machines/` — Composting hardware management, MAC registration, Wi-Fi pairing, soft-deletion, and downlink name sync.
+   * `batches/` — Composting batch lifecycle, feedstock weight combinations, output yields, and historical sensor time-series.
    * `feedstocks/` — Organic feedstock catalog and waste categories.
    * `barangays/` — Local government administrative areas for multi-tenant scoping.
    * `telemetry/` — MQTT HiveMQ ingestion, device status tracking, downlink commands, and Socket.IO real-time gateway broadcasting (`/telemetry`).

@@ -23,12 +23,14 @@ export interface StandardResponse<T> {
   "success": true,
   "data": {
     "id": "user_2xABC123456",
+    "barangayId": "cm123abc...",
     "fullName": "Juan Dela Cruz",
+    "birthday": "1995-05-15T00:00:00.000Z",
     "email": "juan@example.com",
-    "contactNumber": "+639123456789",
-    "location": "Quezon City, Philippines",
-    "createdAt": "2026-08-17T11:00:00.000Z",
-    "updatedAt": "2026-08-17T11:05:00.000Z"
+    "role": "operator",
+    "status": "active",
+    "verificationStatus": "unverified",
+    "createdAt": "2026-08-17T11:00:00.000Z"
   },
   "timestamp": "2026-08-17T11:05:30.123Z"
 }
