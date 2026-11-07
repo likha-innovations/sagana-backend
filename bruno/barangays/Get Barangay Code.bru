@@ -1,0 +1,16 @@
+meta {
+  name: Get Barangay Code
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/barangays/code
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

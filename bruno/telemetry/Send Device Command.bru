@@ -1,0 +1,27 @@
+meta {
+  name: Send Device Command
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/telemetry/devices/:deviceId/command
+  body: json
+  auth: bearer
+}
+
+params:path {
+  deviceId: AA:BB:CC:DD:EE:FF
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "action": "restart",
+    "payload": {}
+  }
+}
+

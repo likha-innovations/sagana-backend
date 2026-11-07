@@ -1,0 +1,22 @@
+meta {
+  name: Join Barangay (Me)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/me/barangay-code
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "code": "BRGY-123456"
+  }
+}
+

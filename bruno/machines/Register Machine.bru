@@ -1,0 +1,24 @@
+meta {
+  name: Register Machine
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/machines/register
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Composter 1",
+    "macAddress": "AA:BB:CC:DD:EE:FF",
+    "wifiSsid": "SaganaNet"
+  }
+}
+

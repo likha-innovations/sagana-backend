@@ -1,0 +1,16 @@
+meta {
+  name: Rotate Barangay Code
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/barangays/code/rotate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

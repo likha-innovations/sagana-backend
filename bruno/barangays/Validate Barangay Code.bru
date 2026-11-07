@@ -1,0 +1,18 @@
+meta {
+  name: Validate Barangay Code
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/barangays/validate-code
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "code": "BRGY-123456"
+  }
+}
+
