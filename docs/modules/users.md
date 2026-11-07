@@ -33,7 +33,7 @@ The **Users Module** manages user identity data within the local PostgreSQL data
 Retrieves user information associated with the authenticated Clerk User ID.
 
 The returned `verificationStatus` is informational; it does not restrict access.
-The migration marks existing users as `verified`; newly created users default to `unverified`. The separate user seed helper inserts only explicitly supplied users and skips existing records.
+The migration marks existing users as `verified`; newly created users default to `unverified`. The separate user seed helper inserts only explicitly supplied users and skips existing records. For developer-provisioned accounts, setting `publicMetadata: { role: 'admin', barangayId: '...' }` in the Clerk Dashboard will automatically assign the admin role and barangay during initial profile synchronization. Client-writable `unsafeMetadata` is ignored for roles.
 
 * **Headers:** `Authorization: Bearer <clerk_session_token>`
 * **Success Response (200 OK):**
