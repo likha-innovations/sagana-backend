@@ -60,18 +60,21 @@ The repository contains pre-configured [Bruno](https://www.usebruno.com/) reques
 
 ```
 bruno/
-├── auth/
+├── environments/
+│   └── Local.bru
+├── barangays/
+├── batches/
+├── feedstocks/
+├── machines/
 ├── system/
-│   └── Health Check.bru
+├── telemetry/
 └── users/
-    ├── Get Profile (Me).bru
-    └── Update Profile (Me).bru
 ```
 
 ### Setting up Environment Variables in Bruno
 1. Open Bruno and choose **Open Collection**.
 2. Select the `sagana-backend/bruno` folder.
-3. Configure your local environment with `baseUrl = http://localhost:3000` and `token = <your_clerk_jwt>`.
+3. Select the `Local` environment (pre-configured with `baseUrl = http://localhost:3000/api`) and set `token` to your Clerk JWT.
 
 ---
 

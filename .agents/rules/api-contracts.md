@@ -30,3 +30,9 @@
 ## 4. API Prefix & Route Discipline
 - **Respect Global Prefix**: Route paths in controllers must never hardcode prefixes (use `@Controller('me')`, never `@Controller('api/me')`).
 - If `process.env.API_PREFIX` is set, `main.ts` will automatically apply the global prefix.
+
+## 5. Bruno API Collections
+- Every endpoint in the backend must have a corresponding `.bru` file inside `bruno/<module>/`.
+- Whenever a new endpoint is created or modified, always create or update its `.bru` file.
+- Use `{{baseUrl}}` for endpoints, `auth: bearer` with `{{token}}` for protected routes, and define valid Zod-compliant JSON bodies and parameters.
+

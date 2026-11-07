@@ -1,0 +1,16 @@
+meta {
+  name: List Machines
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/machines
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

@@ -1,0 +1,27 @@
+meta {
+  name: Get Machine Readings
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/machines/:id/readings
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~startDate: 2026-10-01T00:00:00.000Z
+  ~endDate: 2026-10-10T00:00:00.000Z
+  ~offset: 0
+  ~limit: 200
+}
+
+params:path {
+  id: machine123
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

@@ -1,0 +1,26 @@
+meta {
+  name: Finish Batch
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/batches/:id/finish
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: batch123
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "outputWeight": 14.2
+  }
+}
+

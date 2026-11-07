@@ -1,0 +1,27 @@
+meta {
+  name: Update Machine
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/machines/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: machine123
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Composter 1 Updated",
+    "wifiSsid": "SaganaNet"
+  }
+}
+

@@ -1,0 +1,28 @@
+meta {
+  name: Start Batch
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/batches
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "machineId": "machine123",
+    "feedstocks": [
+      {
+        "id": "feedstock123",
+        "weight": 20
+      }
+    ]
+  }
+}
+

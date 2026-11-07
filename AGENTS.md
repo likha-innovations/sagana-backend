@@ -26,3 +26,15 @@
 - **Minimum Code That Needs to Exist**: Apply strict YAGNI. Write lean, stdlib/native-first implementations.
 - **Strip All Conversational Fluff**: Eliminate polite filler, preamble, self-evident narration, and hedging ("Sure!", "I'd be glad to help", "As an AI model", "As requested").
 - **Dense, Exact Prose**: Keep technical terms exact, file links clickable, and explanations terse and compact.
+
+---
+
+## 4. 📬 Endpoint Management & Bruno Collections (Mandatory)
+- **Always Create/Update `.bru` Files**: Whenever a new endpoint is created or an existing route/payload is modified, immediately create or update the corresponding `.bru` file under `bruno/<module>/`.
+- **Collection Standards**:
+  - Organize requests by module directory (`bruno/<module>/<Action Name>.bru`).
+  - Use `{{baseUrl}}` in all request URLs (`{{baseUrl}}/<path>`).
+  - Use `auth: bearer` with `token: {{token}}` for authenticated routes; `auth: none` for `@Public()` routes.
+  - Provide valid sample payloads conforming to the endpoint's Zod DTO schema.
+  - Define route/path parameters via `params:path` and query parameters via `params:query`.
+

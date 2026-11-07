@@ -1,15 +1,15 @@
 meta {
   name: Get Profile (Me)
   type: http
-  seq: 3
+  seq: 1
 }
 
 get {
-  url: http://localhost:3000/api/me
+  url: {{baseUrl}}/me
   body: none
   auth: bearer
 }
 
 auth:bearer {
-  token: YOUR_CLERK_TOKEN_HERE
+  token: {{token}}
 }

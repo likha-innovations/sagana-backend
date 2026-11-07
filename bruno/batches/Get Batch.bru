@@ -1,0 +1,20 @@
+meta {
+  name: Get Batch
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/batches/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: batch123
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

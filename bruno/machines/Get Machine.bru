@@ -1,0 +1,20 @@
+meta {
+  name: Get Machine
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/machines/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: machine123
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
