@@ -10,6 +10,7 @@ describe('UsersService', () => {
   let service: UsersService;
   let prismaService: {
     user: { findMany: jest.Mock; findUnique: jest.Mock; upsert: jest.Mock };
+    barangay: { findUnique: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -18,6 +19,9 @@ describe('UsersService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         upsert: jest.fn(),
+      },
+      barangay: {
+        findUnique: jest.fn(),
       },
     };
 
@@ -73,31 +77,103 @@ describe('UsersService', () => {
   });
 
   describe('profile synchronization', () => {
-    it('does not assign or overwrite a role from Clerk metadata', async () => {
+    it('provisions admin role and assigned barangay when present in publicMetadata', async () => {
+      prismaService.user.findUnique.mockResolvedValue(null);
+      prismaService.barangay.findUnique.mockResolvedValue({ id: 'b1' });
+      prismaService.user.upsert.mockResolvedValue({
+        id: 'admin_1',
+        role: 'admin',
+        barangayId: 'b1',
+      });
+      jest.mocked(createClerkClient).mockReturnValue({
+        users: {
+          getUser: jest.fn().mockResolvedValue({
+            emailAddresses: [{ emailAddress: 'admin@example.com' }],
+            publicMetadata: { role: 'admin', barangayId: 'b1' },
+            unsafeMetadata: {},
+            fullName: 'Admin User',
+          }),
+        },
+      } as never);
+      await service.getProfile('admin_1');
+      const args = prismaService.user.upsert.mock.calls[0][0];
+      expect(args.create.role).toBe('admin');
+      expect(args.create.barangayId).toBe('b1');
+      expect(args.update.role).toBe('admin');
+      expect(args.update.barangayId).toBe('b1');
+      expect(args.include.barangay.select).not.toHaveProperty('code');
+    });
+
+    it('rejects client-side unsafeMetadata role attempt and forces operator', async () => {
       prismaService.user.findUnique.mockResolvedValue(null);
       prismaService.user.upsert.mockResolvedValue({
         id: 'user_1',
         role: 'operator',
+        barangayId: null,
       });
       jest.mocked(createClerkClient).mockReturnValue({
         users: {
           getUser: jest.fn().mockResolvedValue({
             emailAddresses: [{ emailAddress: 'user@example.com' }],
-            publicMetadata: { role: 'admin', barangay: 'b1' },
-            unsafeMetadata: { role: 'admin', barangay: 'b2' },
+            publicMetadata: {},
+            unsafeMetadata: { role: 'admin', barangayId: 'b2' },
             fullName: 'Test User',
-            firstName: 'Test',
-            lastName: 'User',
           }),
         },
       } as never);
       await service.getProfile('user_1');
       const args = prismaService.user.upsert.mock.calls[0][0];
-      expect(args.create).not.toHaveProperty('role');
+      expect(args.create.role).toBe('operator');
+      expect(args.create.barangayId).toBeNull();
       expect(args.update).not.toHaveProperty('role');
-      expect(args.create).not.toHaveProperty('barangayId');
       expect(args.update).not.toHaveProperty('barangayId');
-      expect(args.include.barangay.select).not.toHaveProperty('code');
+    });
+
+    it('safely handles non-existent publicMetadata.barangayId by falling back to null', async () => {
+      prismaService.user.findUnique.mockResolvedValue(null);
+      prismaService.barangay.findUnique.mockResolvedValue(null);
+      prismaService.user.upsert.mockResolvedValue({
+        id: 'admin_2',
+        role: 'admin',
+        barangayId: null,
+      });
+      jest.mocked(createClerkClient).mockReturnValue({
+        users: {
+          getUser: jest.fn().mockResolvedValue({
+            emailAddresses: [{ emailAddress: 'admin2@example.com' }],
+            publicMetadata: { role: 'admin', barangayId: 'nonexistent_brgy' },
+            unsafeMetadata: {},
+            fullName: 'Admin Two',
+          }),
+        },
+      } as never);
+      await service.getProfile('admin_2');
+      const args = prismaService.user.upsert.mock.calls[0][0];
+      expect(args.create.role).toBe('admin');
+      expect(args.create.barangayId).toBeNull();
+    });
+
+    it('defaults to operator when publicMetadata is empty', async () => {
+      prismaService.user.findUnique.mockResolvedValue(null);
+      prismaService.user.upsert.mockResolvedValue({
+        id: 'user_3',
+        role: 'operator',
+        barangayId: null,
+      });
+      jest.mocked(createClerkClient).mockReturnValue({
+        users: {
+          getUser: jest.fn().mockResolvedValue({
+            emailAddresses: [{ emailAddress: 'user3@example.com' }],
+            publicMetadata: {},
+            unsafeMetadata: {},
+            fullName: 'Normal User',
+          }),
+        },
+      } as never);
+      await service.getProfile('user_3');
+      const args = prismaService.user.upsert.mock.calls[0][0];
+      expect(args.create.role).toBe('operator');
+      expect(args.create.barangayId).toBeNull();
     });
   });
 });

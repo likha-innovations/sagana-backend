@@ -56,6 +56,23 @@ export class UsersService {
           unsafeMetadata.status ||
           'active') as string;
 
+        const isAdmin = publicMetadata.role === 'admin';
+        const role = isAdmin ? 'admin' : 'operator';
+
+        let barangayId: string | null = null;
+        if (isAdmin && typeof publicMetadata.barangayId === 'string') {
+          const candidate = publicMetadata.barangayId.trim();
+          if (candidate) {
+            const barangay = await this.prisma.barangay.findUnique({
+              where: { id: candidate },
+              select: { id: true },
+            });
+            if (barangay) {
+              barangayId = barangay.id;
+            }
+          }
+        }
+
         user = await this.prisma.user.upsert({
           where: { id: userId },
           update: {
@@ -63,6 +80,8 @@ export class UsersService {
             email,
             birthday,
             status,
+            ...(isAdmin ? { role: 'admin' } : {}),
+            ...(barangayId ? { barangayId } : {}),
           },
           create: {
             id: userId,
@@ -70,6 +89,8 @@ export class UsersService {
             email,
             birthday,
             status,
+            role,
+            barangayId,
           },
           include: { barangay: barangayProfile },
         });
