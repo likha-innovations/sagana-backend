@@ -77,7 +77,7 @@ When an ESP32 device publishes `"status": "online"`, the backend automatically c
 
 | Method | Endpoint | Protected | Description |
 | :--- | :--- | :---: | :--- |
-| **`POST`** | `/api/telemetry/devices/:deviceId/command` | 🔒 Yes | Dispatches an MQTT command down to a physical hardware device. |
+| **`POST`** | `/telemetry/devices/:deviceId/command` | 🔒 Yes | Dispatches an MQTT command down to a physical hardware device. |
 
 ---
 

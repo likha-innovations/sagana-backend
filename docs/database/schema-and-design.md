@@ -49,6 +49,7 @@ erDiagram
     barangays {
         string id PK "cuid"
         string name "Barangay name"
+        string code UK "Unique join code (optional)"
         string status "active"
         datetime createdAt
     }
@@ -61,6 +62,7 @@ erDiagram
         string email UK
         string role "operator"
         string status "active"
+        string verificationStatus "unverified | verified"
         datetime createdAt
     }
 
@@ -142,7 +144,7 @@ erDiagram
         string sensorId FK
         string batchId FK
         float value
-        datetime timestamp
+        datetime recordedAt "Recorded timestamp"
     }
 ```
 
@@ -159,6 +161,9 @@ pnpm prisma generate
 
 # Open interactive Prisma Studio in browser
 pnpm prisma studio
+
+# Seed initial barangay join codes
+pnpm run seed:barangay-codes
 
 # Run machine hard-delete maintenance cleanup
 pnpm run delete:machines

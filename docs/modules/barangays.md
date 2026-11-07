@@ -30,20 +30,91 @@ Returns all active barangay entries used during operator onboarding and profile 
     "data": [
       {
         "id": "cm1bg01",
-        "name": "Barangay San Antonio",
-        "status": "active",
-        "createdAt": "2026-08-01T00:00:00.000Z"
+        "name": "Barangay Holy Spirit"
       },
       {
         "id": "cm1bg02",
-        "name": "Barangay Holy Spirit",
-        "status": "active",
-        "createdAt": "2026-08-01T00:00:00.000Z"
+        "name": "Barangay San Antonio"
       }
     ],
     "timestamp": "2026-11-03T01:20:00.000Z"
   }
   ```
+
+---
+
+### 2. `POST /barangays/validate-code`
+Validates an active 6-character barangay join code and returns the matching barangay ID and name. Rate limited to 10 requests per minute via `ThrottlerGuard`.
+
+* **Authorization:** Public (`@Public()`)
+* **Request Body Schema:**
+  ```typescript
+  {
+    code: string; // 6 alphanumeric characters; whitespace trimmed, case-insensitive
+  }
+  ```
+* **Sample Request Body:**
+  ```json
+  {
+    "code": "ABC123"
+  }
+  ```
+* **Success Response (201 Created):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "cm1bg02",
+      "name": "Barangay San Antonio"
+    },
+    "timestamp": "2026-11-03T01:20:00.000Z"
+  }
+  ```
+* **Error Responses:**
+  * `400 Bad Request`: Code is missing, inactive, or malformed (`"Invalid barangay code"`).
+  * `429 Too Many Requests`: Exceeded 10 requests per minute rate limit.
+
+---
+
+### 3. `GET /barangays/code`
+Returns the current join code for the authenticated administrator's assigned barangay.
+
+* **Authorization:** Admin (`@AdminOnly()`)
+* **Headers:** `Authorization: Bearer <clerk_session_token>`
+* **Success Response (200 OK):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "code": "ABC123"
+    },
+    "timestamp": "2026-11-03T01:20:00.000Z"
+  }
+  ```
+* **Error Responses:**
+  * `401 Unauthorized`: Missing or invalid Clerk token.
+  * `403 Forbidden`: User is not an admin or does not have an assigned barangay.
+
+---
+
+### 4. `POST /barangays/code/rotate`
+Generates and assigns a new random 6-character join code for the administrator's barangay, replacing the old code immediately.
+
+* **Authorization:** Admin (`@AdminOnly()`)
+* **Headers:** `Authorization: Bearer <clerk_session_token>`
+* **Success Response (201 Created):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "code": "XYZ789"
+    },
+    "timestamp": "2026-11-03T01:20:00.000Z"
+  }
+  ```
+* **Error Responses:**
+  * `401 Unauthorized`: Missing or invalid Clerk token.
+  * `403 Forbidden`: Admin role or barangay assignment missing.
 
 ---
 

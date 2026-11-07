@@ -46,8 +46,11 @@ pnpm run docs:dev
 ```
 The documentation hub will open on `http://localhost:5173`.
 
-### 5. Maintenance Scripts
+### 5. Maintenance & Seeding Scripts
 ```bash
+# Seed initial barangay join codes
+pnpm run seed:barangay-codes
+
 # Hard-delete test/reset machines by MAC address
 pnpm run delete:machines
 ```
