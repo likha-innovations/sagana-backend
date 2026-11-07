@@ -72,7 +72,7 @@
     "husky": "^9.1.7",
     "jest": "^30.0.0",
     "mermaid": "^11.16.1",
-    "prettier": "^3.4.2",
+    "prettier": "^3.9.10",
     "prisma": "^7.9.1",
     "prisma-erd-generator": "^2.4.4",
     "source-map-support": "^0.5.21",
