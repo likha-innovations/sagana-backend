@@ -69,14 +69,6 @@ const batchExample = {
     },
   ],
   compostingPhases: [],
-  compostOutput: {
-    id: 'output123',
-    batchId: 'batch123',
-    outputWeight: 14.2,
-    productionDate: '2026-10-10T00:00:00.000Z',
-    collectionDate: null,
-    status: 'ready_for_collection',
-  },
 };
 const historyExample = {
   sensors: [
@@ -120,7 +112,7 @@ export class BatchesController {
   @ApiOperation({
     summary: '[Shared] List batches',
     description:
-      'Returns feedstocks, phases, and any compost output. A completion date takes precedence over the stored status.',
+      'Returns feedstocks and phases. A completion date takes precedence over the stored status.',
   })
   @ApiResponse({
     status: 200,
@@ -150,8 +142,7 @@ export class BatchesController {
   @ApiParam({ name: 'id', description: 'Batch ID' })
   @ApiResponse({
     status: 200,
-    description:
-      'Batch with machine name, feedstocks, phases, and optional output.',
+    description: 'Batch with machine name, feedstocks, and phases.',
     content: { 'application/json': { example: response(batchExample) } },
   })
   @ApiErrorExample(
@@ -211,7 +202,7 @@ export class BatchesController {
   @ApiResponse({
     status: 201,
     description:
-      'Batch created with active status and no completion date or output.',
+      'Batch created with active status and no completion date or final weight.',
     content: {
       'application/json': {
         example: response({
@@ -219,7 +210,6 @@ export class BatchesController {
           status: 'active',
           completionDate: null,
           finalWeight: null,
-          compostOutput: null,
         }),
       },
     },
@@ -255,8 +245,7 @@ export class BatchesController {
   @Post('batches/:id/finish')
   @ApiOperation({
     summary: '[Shared] Finish a batch',
-    description:
-      'Records completion. An output record is created only when a measured output weight is supplied.',
+    description: 'Records completion and stores measured final output weight.',
   })
   @ApiParam({ name: 'id', description: 'Batch ID' })
   @ApiBody({
