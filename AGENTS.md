@@ -38,3 +38,22 @@
   - Provide valid sample payloads conforming to the endpoint's Zod DTO schema.
   - Define route/path parameters via `params:path` and query parameters via `params:query`.
 
+---
+
+## 5. 🔍 Two-Tier Codebase Scanning (Graphify & Ground-Truth Protocol)
+
+### Macro Navigation (When to use Graphify)
+- **Use Graphify for Architecture & Tracing (When Present)**: Use only when `graphify-out/graph.json` is present to find where capabilities live across unfamiliar modules, assess blast radius (*"What calls X?"*), or trace paths (*`graphify path "A" "B"`*). If the graph is missing, inspect source files directly instead.
+- **Hard Ban on Direct `graph.json` Reads**: NEVER use `read_file`, `grep`, or shell dumps directly on `graphify-out/graph.json` (~300,000+ tokens). Always execute scoped, off-context queries via the CLI with a token budget:
+  ```powershell
+  graphify query "<question>" --budget 1500
+  ```
+  or through the supported `query_graph` MCP interface when the CLI is unavailable.
+- **Toggle**: Can be bypassed when the user explicitly requests `--no-graph` or raw file scanning.
+
+### Micro Execution (When to use Direct Files)
+- **Direct File First (Skip Graphify)**: When a prompt explicitly names a source file or component (e.g. *"Fix lockout in app/(auth)/sign-in.tsx"*), open the file directly via `read_file`. Do not query the graph first; reserve graph queries strictly for checking unknown downstream dependencies or blast radius.
+- **Micro Precision & Edits**: Always inspect live source files directly for exact syntax, type definitions, error signatures, and preparing atomic code changes.
+- **Silent Source Fallback (Stale Graph)**: If recent git commits or file modifications occurred after the graph was built, or if graph output is ambiguous/misaligned, silently fall back to inspecting live source files directly without triggering an auto-rebuild.
+
+
