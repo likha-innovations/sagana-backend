@@ -72,6 +72,7 @@ model CompostBatch {
   machineId      String    @map("machine_id")
   userId         String    @map("user_id")
   totalWeight    Float     @map("total_weight")
+  finalWeight    Float?    @map("final_weight")
   batchCode      String    @unique @map("batch_code")
   startDate      DateTime  @map("start_date")
   completionDate DateTime? @map("completion_date")
@@ -80,7 +81,6 @@ model CompostBatch {
   machine          Machine           @relation(fields: [machineId], references: [id])
   user             User              @relation(fields: [userId], references: [id])
   feedstocks       BatchFeedstock[]
-  compostOutput    CompostOutput?
   compostingPhases CompostingPhase[]
   sensorReadings   SensorReading[]
 
@@ -111,26 +111,12 @@ model BatchFeedstock {
   @@map("batch_feedstocks")
 }
 
-model CompostOutput {
-  id             String    @id @default(cuid()) @map("output_id")
-  batchId        String    @unique @map("batch_id")
-  outputWeight   Float     @map("output_weight")
-  productionDate DateTime  @map("production_date")
-  collectionDate DateTime? @map("collection_date")
-  status         String    @default("active")
-
-  batch CompostBatch @relation(fields: [batchId], references: [id])
-
-  @@map("compost_outputs")
-}
-
 model CompostingPhase {
-  id        String    @id @default(cuid()) @map("phase_id")
-  batchId   String    @map("batch_id")
-  phaseName String    @map("phase_name")
-  startTime DateTime  @map("start_time")
-  endTime   DateTime? @map("end_time")
-  status    String    @default("active")
+  id        String   @id @default(cuid()) @map("phase_id")
+  batchId   String   @map("batch_id")
+  phaseName String   @map("phase_name")
+  timestamp DateTime @default(now()) @map("timestamp")
+  status    String   @default("active")
 
   batch CompostBatch @relation(fields: [batchId], references: [id])
 

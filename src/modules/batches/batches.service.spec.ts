@@ -13,7 +13,7 @@ describe('BatchesService', () => {
   const sensor = { findMany: jest.fn() };
   const sensorReading = { findMany: jest.fn() };
   const telemetryLog = { findMany: jest.fn() };
-  const tx = { compostBatch, compostOutput: { create: jest.fn() } };
+  const tx = { compostBatch };
   const prisma = {
     user,
     machine,
@@ -43,7 +43,7 @@ describe('BatchesService', () => {
       completionDate: new Date(),
       machine: { name: 'Machine' },
       feedstocks: [],
-      compostOutput: null,
+      finalWeight: null,
       compostingPhases: [],
     });
     const result = await service.get('user', 'b');
@@ -55,23 +55,22 @@ describe('BatchesService', () => {
     });
   });
 
-  it('rejects a second finish before creating an output', async () => {
+  it('rejects a second finish on an inactive batch', async () => {
     user.findUnique.mockResolvedValue({ barangayId: 'barangay' });
     compostBatch.findFirst.mockResolvedValue({
       id: 'b',
       machine: { name: 'Machine' },
       feedstocks: [],
-      compostOutput: null,
+      finalWeight: null,
       compostingPhases: [],
     });
     compostBatch.updateMany.mockResolvedValue({ count: 0 });
     await expect(service.finish('user', 'b', 2)).rejects.toBeInstanceOf(
       ConflictException,
     );
-    expect(tx.compostOutput.create).not.toHaveBeenCalled();
   });
 
-  it('finishes without inventing an output weight', async () => {
+  it('finishes with or without an output weight', async () => {
     user.findUnique.mockResolvedValue({ barangayId: 'barangay' });
     const batch = {
       id: 'b',
@@ -79,7 +78,7 @@ describe('BatchesService', () => {
       completionDate: new Date(),
       machine: { name: 'Machine' },
       feedstocks: [],
-      compostOutput: null,
+      finalWeight: null,
       compostingPhases: [],
     };
     compostBatch.findFirst.mockResolvedValue(batch);
@@ -88,7 +87,15 @@ describe('BatchesService', () => {
     Object.assign(tx.compostBatch, { findUniqueOrThrow });
     const result = await service.finish('user', 'b');
     expect(result.finalWeight).toBeNull();
-    expect(tx.compostOutput.create).not.toHaveBeenCalled();
+    expect(compostBatch.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'b', status: 'active', completionDate: null },
+        data: expect.objectContaining({
+          status: 'completed',
+          finalWeight: undefined,
+        }),
+      }),
+    );
   });
 
   it('paginates batch sensor readings without querying telemetry logs', async () => {

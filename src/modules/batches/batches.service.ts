@@ -11,8 +11,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 const include = {
   machine: { select: { name: true } },
   feedstocks: { include: { feedstock: true } },
-  compostOutput: true,
-  compostingPhases: { orderBy: { startTime: 'asc' as const } },
+  compostingPhases: { orderBy: { timestamp: 'asc' as const } },
 };
 type Batch = Prisma.CompostBatchGetPayload<{ include: typeof include }>;
 type HistoryQuery = {
@@ -33,8 +32,7 @@ function present(batch: Batch) {
     completionDate: batch.completionDate,
     totalWeight: batch.totalWeight,
     machineName: batch.machine.name,
-    finalWeight: batch.compostOutput?.outputWeight ?? null,
-    compostOutput: batch.compostOutput,
+    finalWeight: batch.finalWeight ?? null,
     compostingPhases: batch.compostingPhases,
     feedstocks: batch.feedstocks.map((item) => ({
       id: item.id,
@@ -150,19 +148,14 @@ export class BatchesService {
       const now = new Date();
       const updated = await tx.compostBatch.updateMany({
         where: { id: batch.id, status: 'active', completionDate: null },
-        data: { status: 'completed', completionDate: now },
+        data: {
+          status: 'completed',
+          completionDate: now,
+          finalWeight: outputWeight,
+        },
       });
       if (updated.count !== 1)
         throw new ConflictException('Batch is not active');
-      if (outputWeight !== undefined)
-        await tx.compostOutput.create({
-          data: {
-            batchId: id,
-            outputWeight,
-            productionDate: now,
-            status: 'ready_for_collection',
-          },
-        });
       const result = await tx.compostBatch.findUniqueOrThrow({
         where: { id },
         include,

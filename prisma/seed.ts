@@ -1,7 +1,6 @@
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { seedBarangayCodes } from './seed-barangays';
 
 const connectionString = `${process.env.DATABASE_URL}`;
 const pool = new Pool({ connectionString });
@@ -25,9 +24,6 @@ async function purgeMachineData(machineId: string) {
 
   if (batchIds.length > 0) {
     await prisma.sensorReading.deleteMany({
-      where: { batchId: { in: batchIds } },
-    });
-    await prisma.compostOutput.deleteMany({
       where: { batchId: { in: batchIds } },
     });
     await prisma.compostingPhase.deleteMany({
@@ -150,27 +146,8 @@ async function main() {
     console.warn('Could not run raw whitespace cleanup:', err);
   }
 
-  // 2. Seed Barangays 170-180
-  console.log('2. Seeding Barangays 170-180...');
-  const barangays = Array.from({ length: 11 }, (_, i) => ({
-    number: 170 + i,
-    name: `Barangay ${170 + i}`,
-  }));
-
-  for (const brgy of barangays) {
-    const id = `brgy_${brgy.number}`;
-    await prisma.barangay.upsert({
-      where: { id },
-      update: { name: brgy.name },
-      create: { id, name: brgy.name },
-    });
-  }
-
-  // Seed barangay codes if needed
-  await seedBarangayCodes(prisma);
-
-  // 3. Fetch default operator
-  console.log('3. Resolving target operator user...');
+  // 2. Fetch default operator user
+  console.log('2. Resolving target operator user...');
   const existingUser = await prisma.user.findFirst();
   if (!existingUser) {
     console.warn(
@@ -183,8 +160,8 @@ async function main() {
     `Using operator: ${existingUser.fullName || existingUser.id} (${operatorBarangayId})`,
   );
 
-  // 4. Seed Feedstocks Catalog
-  console.log('4. Seeding Feedstocks Catalog...');
+  // 3. Seed Feedstocks Catalog
+  console.log('3. Seeding Feedstocks Catalog...');
   const feedstocksData = [
     {
       id: 'feedstock_veg_scraps',
@@ -236,7 +213,7 @@ async function main() {
     });
   }
 
-  // 5. Canonical Machine Definitions
+  // 4. Canonical Machine Definitions
   const CANONICAL_MACHINES = [
     {
       id: 'machine_sagana_active',
@@ -272,7 +249,7 @@ async function main() {
     },
   ];
 
-  console.log('5. Upserting 4 canonical machines...');
+  console.log('4. Upserting 4 canonical machines...');
   for (const m of CANONICAL_MACHINES) {
     await prisma.machine.upsert({
       where: { macAddress: m.macAddress },
@@ -352,14 +329,12 @@ async function main() {
         create: [
           {
             phaseName: 'Mesophilic Phase',
-            startTime: m1StartDate,
-            endTime: m1Phase1End,
+            timestamp: m1StartDate,
             status: 'completed',
           },
           {
             phaseName: 'Thermophilic Phase',
-            startTime: m1Phase1End,
-            endTime: null,
+            timestamp: m1Phase1End,
             status: 'active',
           },
         ],
@@ -400,6 +375,7 @@ async function main() {
       userId: existingUser.id,
       batchCode: 'BATCH-2026-HARVEST-005',
       totalWeight: 25.0,
+      finalWeight: 15.2,
       startDate: m2StartDate,
       completionDate: m2CompletionDate,
       status: 'completed',
@@ -413,31 +389,20 @@ async function main() {
         create: [
           {
             phaseName: 'Mesophilic Phase',
-            startTime: m2StartDate,
-            endTime: m2Phase1End,
+            timestamp: m2StartDate,
             status: 'completed',
           },
           {
             phaseName: 'Thermophilic Phase',
-            startTime: m2Phase1End,
-            endTime: m2Phase2End,
+            timestamp: m2Phase1End,
             status: 'completed',
           },
           {
             phaseName: 'Cooling Phase',
-            startTime: m2Phase2End,
-            endTime: m2CompletionDate,
+            timestamp: m2Phase2End,
             status: 'completed',
           },
         ],
-      },
-      compostOutput: {
-        create: {
-          outputWeight: 15.2,
-          productionDate: m2CompletionDate,
-          collectionDate: null,
-          status: 'ready_for_collection',
-        },
       },
     },
   });
@@ -455,7 +420,7 @@ async function main() {
   });
   await prisma.sensorReading.createMany({ data: readings2 });
   console.log(
-    `✅ Machine 2 [${machine2.name}] seeded with completed batch, 15.2 kg output ready for collection, and 0 active batches.`,
+    `✅ Machine 2 [${machine2.name}] seeded with completed batch, 15.2 kg final weight, and 0 active batches.`,
   );
 
   // =========================================================================
@@ -496,14 +461,12 @@ async function main() {
         create: [
           {
             phaseName: 'Mesophilic Phase',
-            startTime: m4StartDate,
-            endTime: m4Phase1End,
+            timestamp: m4StartDate,
             status: 'completed',
           },
           {
             phaseName: 'Thermophilic Phase',
-            startTime: m4Phase1End,
-            endTime: null,
+            timestamp: m4Phase1End,
             status: 'active',
           },
         ],
