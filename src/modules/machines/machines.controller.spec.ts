@@ -36,6 +36,10 @@ describe('Machine read access', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    sensorReading: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
 
   beforeAll(async () => {
@@ -85,6 +89,58 @@ describe('Machine read access', () => {
       .auth('valid', { type: 'bearer' })
       .expect(200);
     expect(response.body.data).toEqual(machines[0]);
+  });
+
+  it('attaches latest readings from vertical sensor readings table when available', async () => {
+    const recordedAt = new Date('2026-11-08T05:35:18.000Z');
+    const mockReadings = [
+      {
+        id: 'r1',
+        value: 55.4,
+        recordedAt,
+        sensorType: 'temperature',
+      },
+      {
+        id: 'r2',
+        value: 62.1,
+        recordedAt,
+        sensorType: 'moisture',
+      },
+      {
+        id: 'r3',
+        value: 15.3,
+        recordedAt,
+        sensorType: 'o2',
+      },
+      {
+        id: 'r4',
+        value: 680,
+        recordedAt,
+        sensorType: 'co2',
+      },
+    ];
+
+    prisma.sensorReading.findFirst.mockImplementation(({ where }) => {
+      const types = where.sensor.sensorType.in;
+      const match = mockReadings.find((r) => types.includes(r.sensorType));
+      return Promise.resolve(match ?? null);
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/machines/neo2')
+      .auth('valid', { type: 'bearer' })
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      ...machines[0],
+      latestReadings: {
+        temperature: 55.4,
+        moisture: 62.1,
+        oxygen: 15.3,
+        co2: 680,
+        updatedAt: recordedAt.toISOString(),
+      },
+    });
   });
 
   it.each(['other', 'removed', 'missing'])(

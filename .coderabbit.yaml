@@ -5,4 +5,4 @@ reviews:
     drafts: true
     base_branches:
       - '.*'
-    auto_incremental_review: false
+    auto_incremental_review: true

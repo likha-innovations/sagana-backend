@@ -34,10 +34,11 @@ export class MachinesService {
   async findAll(userId: string) {
     const barangayId = await this.getBarangayId(userId);
     if (!barangayId) return [];
-    return this.prisma.machine.findMany({
+    const machines = await this.prisma.machine.findMany({
       where: { barangayId, removedAt: null },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
+    return Promise.all(machines.map((m) => this.attachLatestReadings(m)));
   }
 
   async findOne(userId: string, id: string) {
@@ -48,7 +49,87 @@ export class MachinesService {
         })
       : null;
     if (!machine) throw new NotFoundException('Machine not found');
-    return machine;
+    return this.attachLatestReadings(machine);
+  }
+
+  private async attachLatestReadings<T extends { id: string }>(
+    machine: T,
+  ): Promise<
+    T & {
+      latestReadings?: {
+        temperature: number | null;
+        moisture: number | null;
+        oxygen: number | null;
+        co2: number | null;
+        updatedAt: string;
+      };
+    }
+  > {
+    try {
+      if (!this.prisma.sensorReading) {
+        return machine;
+      }
+
+      const SENSOR_TYPES = [
+        { key: 'temperature' as const, queryTypes: ['temperature'] },
+        { key: 'moisture' as const, queryTypes: ['moisture'] },
+        { key: 'oxygen' as const, queryTypes: ['oxygen', 'o2'] },
+        { key: 'co2' as const, queryTypes: ['co2'] },
+      ];
+
+      const results = await Promise.all(
+        SENSOR_TYPES.map(async ({ key, queryTypes }) => {
+          const reading = await this.prisma.sensorReading.findFirst({
+            where: {
+              sensor: {
+                machineId: machine.id,
+                sensorType: { in: queryTypes },
+              },
+            },
+            orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+          });
+          return { key, reading };
+        }),
+      );
+
+      let hasAnyReading = false;
+      let latestTimestamp: Date | undefined;
+      const values: {
+        temperature: number | null;
+        moisture: number | null;
+        oxygen: number | null;
+        co2: number | null;
+      } = {
+        temperature: null,
+        moisture: null,
+        oxygen: null,
+        co2: null,
+      };
+
+      for (const { key, reading } of results) {
+        if (reading) {
+          hasAnyReading = true;
+          values[key] = reading.value;
+          if (!latestTimestamp || reading.recordedAt > latestTimestamp) {
+            latestTimestamp = reading.recordedAt;
+          }
+        }
+      }
+
+      if (!hasAnyReading || !latestTimestamp) {
+        return machine;
+      }
+
+      return {
+        ...machine,
+        latestReadings: {
+          ...values,
+          updatedAt: latestTimestamp.toISOString(),
+        },
+      };
+    } catch {
+      return machine;
+    }
   }
 
   async update(userId: string, id: string, dto: UpdateMachineDto) {
