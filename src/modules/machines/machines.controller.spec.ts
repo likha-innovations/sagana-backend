@@ -36,7 +36,10 @@ describe('Machine read access', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
-    sensorReading: { findMany: jest.fn().mockResolvedValue([]) },
+    sensorReading: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
 
   beforeAll(async () => {
@@ -90,32 +93,38 @@ describe('Machine read access', () => {
 
   it('attaches latest readings from vertical sensor readings table when available', async () => {
     const recordedAt = new Date('2026-11-08T05:35:18.000Z');
-    prisma.sensorReading.findMany.mockResolvedValueOnce([
+    const mockReadings = [
       {
         id: 'r1',
         value: 55.4,
         recordedAt,
-        sensor: { sensorType: 'temperature' },
+        sensorType: 'temperature',
       },
       {
         id: 'r2',
         value: 62.1,
         recordedAt,
-        sensor: { sensorType: 'moisture' },
+        sensorType: 'moisture',
       },
       {
         id: 'r3',
         value: 15.3,
         recordedAt,
-        sensor: { sensorType: 'o2' },
+        sensorType: 'o2',
       },
       {
         id: 'r4',
         value: 680,
         recordedAt,
-        sensor: { sensorType: 'co2' },
+        sensorType: 'co2',
       },
-    ]);
+    ];
+
+    prisma.sensorReading.findFirst.mockImplementation(({ where }) => {
+      const types = where.sensor.sensorType.in;
+      const match = mockReadings.find((r) => types.includes(r.sensorType));
+      return Promise.resolve(match ?? null);
+    });
 
     const response = await request(app.getHttpServer())
       .get('/machines/neo2')

@@ -66,71 +66,65 @@ export class MachinesService {
     }
   > {
     try {
-      const sensorReadings = this.prisma.sensorReading
-        ? await this.prisma.sensorReading.findMany({
-            where: { sensor: { machineId: machine.id } },
-            orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
-            include: { sensor: true },
-            take: 20,
-          })
-        : [];
-
-      if (sensorReadings.length === 0) {
+      if (!this.prisma.sensorReading) {
         return machine;
       }
 
-      let temperature: number | null = null;
-      let moisture: number | null = null;
-      let oxygen: number | null = null;
-      let co2: number | null = null;
-      let updatedAt: string | undefined;
+      const SENSOR_TYPES = [
+        { key: 'temperature' as const, queryTypes: ['temperature'] },
+        { key: 'moisture' as const, queryTypes: ['moisture'] },
+        { key: 'oxygen' as const, queryTypes: ['oxygen', 'o2'] },
+        { key: 'co2' as const, queryTypes: ['co2'] },
+      ];
 
-      for (const reading of sensorReadings) {
-        const type =
-          reading.sensor.sensorType === 'o2'
-            ? 'oxygen'
-            : reading.sensor.sensorType;
+      const results = await Promise.all(
+        SENSOR_TYPES.map(async ({ key, queryTypes }) => {
+          const reading = await this.prisma.sensorReading.findFirst({
+            where: {
+              sensor: {
+                machineId: machine.id,
+                sensorType: { in: queryTypes },
+              },
+            },
+            orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+          });
+          return { key, reading };
+        }),
+      );
 
-        if (type === 'temperature' && temperature === null) {
-          temperature = reading.value;
-          if (!updatedAt || reading.recordedAt > new Date(updatedAt)) {
-            updatedAt = reading.recordedAt.toISOString();
-          }
-        } else if (type === 'moisture' && moisture === null) {
-          moisture = reading.value;
-          if (!updatedAt || reading.recordedAt > new Date(updatedAt)) {
-            updatedAt = reading.recordedAt.toISOString();
-          }
-        } else if (type === 'oxygen' && oxygen === null) {
-          oxygen = reading.value;
-          if (!updatedAt || reading.recordedAt > new Date(updatedAt)) {
-            updatedAt = reading.recordedAt.toISOString();
-          }
-        } else if (type === 'co2' && co2 === null) {
-          co2 = reading.value;
-          if (!updatedAt || reading.recordedAt > new Date(updatedAt)) {
-            updatedAt = reading.recordedAt.toISOString();
+      let hasAnyReading = false;
+      let latestTimestamp: Date | undefined;
+      const values: {
+        temperature: number | null;
+        moisture: number | null;
+        oxygen: number | null;
+        co2: number | null;
+      } = {
+        temperature: null,
+        moisture: null,
+        oxygen: null,
+        co2: null,
+      };
+
+      for (const { key, reading } of results) {
+        if (reading) {
+          hasAnyReading = true;
+          values[key] = reading.value;
+          if (!latestTimestamp || reading.recordedAt > latestTimestamp) {
+            latestTimestamp = reading.recordedAt;
           }
         }
       }
 
-      if (
-        temperature === null &&
-        moisture === null &&
-        oxygen === null &&
-        co2 === null
-      ) {
+      if (!hasAnyReading || !latestTimestamp) {
         return machine;
       }
 
       return {
         ...machine,
         latestReadings: {
-          temperature,
-          moisture,
-          oxygen,
-          co2,
-          updatedAt: updatedAt ?? new Date().toISOString(),
+          ...values,
+          updatedAt: latestTimestamp.toISOString(),
         },
       };
     } catch {
