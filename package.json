@@ -28,10 +28,10 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && docker compose up -d",
-    "db:migrate:local": "dotenv -e .env.local -- prisma migrate dev",
-    "db:seed:local": "dotenv -e .env.local -- prisma db seed",
-    "db:studio:local": "dotenv -e .env.local -- prisma studio",
-    "start:local": "dotenv -e .env.local -- nest start --watch"
+    "db:migrate:local": "dotenv -f .env.local -- prisma migrate dev",
+    "db:seed:local": "dotenv -f .env.local -- prisma db seed",
+    "db:studio:local": "dotenv -f .env.local -- prisma studio",
+    "start:local": "dotenv -f .env.local -- nest start --watch"
   },
   "dependencies": {
     "@clerk/backend": "^3.16.1",
