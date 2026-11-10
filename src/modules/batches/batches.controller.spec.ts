@@ -127,17 +127,17 @@ describe('BatchesController', () => {
       app,
       new DocumentBuilder().build(),
     );
-    const create = document.paths['/batches'].post;
-    const history = document.paths['/batches/{id}/readings'].get;
-    expect(create.requestBody).toBeDefined();
-    expect(create.responses['409']).toBeDefined();
-    expect(history.parameters).toEqual(
+    const create = document.paths['/batches']?.post;
+    const history = document.paths['/batches/{id}/readings']?.get;
+    expect(create!.requestBody).toBeDefined();
+    expect(create!.responses['409']).toBeDefined();
+    expect(history!.parameters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'startDate', in: 'query' }),
         expect.objectContaining({ name: 'limit', in: 'query' }),
       ]),
     );
-    expect(history.responses['200']).toHaveProperty(
+    expect(history!.responses['200']).toHaveProperty(
       'content.application/json.example.data.readings',
     );
     await app.close();
