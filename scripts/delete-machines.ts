@@ -3,14 +3,9 @@ import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-/**
- * Configure target MAC addresses below, OR pass them via CLI arguments:
- * e.g. pnpm delete:machines 20:50:0D:E6:C0:3C 38:3E:51:CB:05:74
- */
-export const TARGET_MACS: string[] = [
-  '20:50:0D:E6:C0:3C',
-  '38:3E:51:CB:05:74',
-];
+// Configure target MAC addresses below, OR pass them via CLI arguments:
+// e.g. pnpm delete:machines 20:50:0D:E6:C0:3C 38:3E:51:CB:05:74
+export const TARGET_MACS: string[] = [];
 
 async function main() {
   const cliArgs = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
@@ -96,10 +91,6 @@ async function main() {
         where: { batchId: { in: batchIds } },
       });
 
-      const deletedOutputs = await tx.compostOutput.deleteMany({
-        where: { batchId: { in: batchIds } },
-      });
-
       const deletedBatches = await tx.compostBatch.deleteMany({
         where: { id: { in: batchIds } },
       });
@@ -120,7 +111,6 @@ async function main() {
         batches: deletedBatches.count,
         batchFeedstocks: deletedFeedstocks.count,
         compostingPhases: deletedPhases.count,
-        compostOutputs: deletedOutputs.count,
       };
     });
 
