@@ -142,7 +142,7 @@ export class BatchesService {
     return present(result);
   }
 
-  async finish(userId: string, id: string, outputWeight?: number) {
+  async finish(userId: string, id: string, finalWeight?: number) {
     const batch = await this.find(userId, id);
     return this.prisma.$transaction(async (tx) => {
       const now = new Date();
@@ -151,7 +151,7 @@ export class BatchesService {
         data: {
           status: 'completed',
           completionDate: now,
-          finalWeight: outputWeight,
+          finalWeight,
         },
       });
       if (updated.count !== 1)

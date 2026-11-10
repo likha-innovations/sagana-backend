@@ -58,14 +58,7 @@ Lists all composting batches for machines belonging to the user's assigned baran
           }
         ],
         "compostingPhases": [],
-        "compostOutput": {
-          "id": "output123",
-          "batchId": "cm1batch01",
-          "outputWeight": 16.2,
-          "productionDate": "2026-10-10T00:00:00.000Z",
-          "collectionDate": null,
-          "status": "ready_for_collection"
-        }
+        "finalWeight": 16.2
       }
     ],
     "timestamp": "2026-10-10T00:00:00.000Z"
@@ -118,7 +111,7 @@ Starts a new composting batch. The machine must belong to the user's barangay an
 ---
 
 ### 4. `POST /batches/:id/finish`
-Concludes an active batch. Setting `outputWeight` is optional; if provided, an output record (`CompostOutput`) is created with status `ready_for_collection`.
+Concludes an active batch. Setting `finalWeight` is optional; if provided, it is stored directly on the batch. (`outputWeight` is also accepted as a backwards-compatible alias).
 
 * **Headers:** `Authorization: Bearer <clerk_session_token>`
 * **Path Parameters:**
@@ -126,18 +119,19 @@ Concludes an active batch. Setting `outputWeight` is optional; if provided, an o
 * **Request Body Schema:**
   ```typescript
   {
-    outputWeight?: number; // Optional finite number >= 0 (kg)
+    finalWeight?: number;  // Optional finite number >= 0 (kg)
+    outputWeight?: number; // Backwards-compatible alias for finalWeight
   }
   ```
 * **Sample Request Body:**
   ```json
   {
-    "outputWeight": 14.5
+    "finalWeight": 14.5
   }
   ```
-* **Success Response (201 Created):** Returns completed batch entity with output record.
+* **Success Response (201 Created):** Returns completed batch entity with `finalWeight`.
 * **Error Responses:**
-  * `400 Bad Request`: `outputWeight` is negative or non-finite.
+  * `400 Bad Request`: `finalWeight` is negative or non-finite.
   * `404 Not Found`: Batch not found or belongs to another barangay.
   * `409 Conflict`: Batch is not in `active` status (already completed).
 

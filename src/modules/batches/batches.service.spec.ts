@@ -70,7 +70,7 @@ describe('BatchesService', () => {
     );
   });
 
-  it('finishes with or without an output weight', async () => {
+  it('finishes with or without a final weight', async () => {
     user.findUnique.mockResolvedValue({ barangayId: 'barangay' });
     const batch = {
       id: 'b',
@@ -93,6 +93,17 @@ describe('BatchesService', () => {
         data: expect.objectContaining({
           status: 'completed',
           finalWeight: undefined,
+        }),
+      }),
+    );
+
+    await service.finish('user', 'b', 14.2);
+    expect(compostBatch.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'b', status: 'active', completionDate: null },
+        data: expect.objectContaining({
+          status: 'completed',
+          finalWeight: 14.2,
         }),
       }),
     );

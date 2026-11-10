@@ -33,6 +33,7 @@ const createSchema = z
     'Duplicate feedstocks',
   );
 const finishSchema = z.object({
+  finalWeight: z.number().finite().nonnegative().optional(),
   outputWeight: z.number().finite().nonnegative().optional(),
 });
 const historySchema = z
@@ -252,17 +253,26 @@ export class BatchesController {
     schema: {
       type: 'object',
       properties: {
+        finalWeight: {
+          type: 'number',
+          minimum: 0,
+          description: 'Optional measured final compost weight in kilograms.',
+        },
         outputWeight: {
           type: 'number',
           minimum: 0,
-          description: 'Optional measured compost output in kilograms.',
+          description: 'Backwards-compatible alias for finalWeight.',
         },
       },
     },
     examples: {
-      withoutWeight: { summary: 'Finish without output weight', value: {} },
-      withWeight: {
-        summary: 'Finish with output weight',
+      withoutWeight: { summary: 'Finish without final weight', value: {} },
+      withFinalWeight: {
+        summary: 'Finish with final weight',
+        value: { finalWeight: 14.2 },
+      },
+      withOutputWeight: {
+        summary: 'Finish with output weight (legacy alias)',
         value: { outputWeight: 14.2 },
       },
     },
@@ -298,7 +308,8 @@ export class BatchesController {
     @Body(new ZodValidationPipe(finishSchema))
     body: z.infer<typeof finishSchema>,
   ) {
-    return this.batches.finish(userId, id, body.outputWeight);
+    const finalWeight = body.finalWeight ?? body.outputWeight;
+    return this.batches.finish(userId, id, finalWeight);
   }
 
   @Get('machines/:id/readings')
