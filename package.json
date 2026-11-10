@@ -24,7 +24,14 @@
     "docs:build": "vitepress build docs",
     "delete:machines": "ts-node scripts/delete-machines.ts",
     "seed:barangay-codes": "ts-node prisma/seed-barangay-codes.ts",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d",
+    "db:migrate:local": "dotenv -e .env.local -- prisma migrate dev",
+    "db:seed:local": "dotenv -e .env.local -- prisma db seed",
+    "db:studio:local": "dotenv -e .env.local -- prisma studio",
+    "start:local": "dotenv -e .env.local -- nest start --watch"
   },
   "dependencies": {
     "@clerk/backend": "^3.16.1",
