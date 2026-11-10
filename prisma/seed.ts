@@ -11,7 +11,7 @@ const prisma = new PrismaClient({ adapter });
 const SENSOR_CONFIGS = [
   { type: 'temperature', unit: '°C', location: 'core' },
   { type: 'moisture', unit: '%', location: 'chamber' },
-  { type: 'o2', unit: '%', location: 'aeration' },
+  { type: 'oxygen', unit: '%', location: 'aeration' },
   { type: 'co2', unit: 'ppm', location: 'exhaust' },
 ];
 
@@ -36,6 +36,11 @@ async function purgeMachineData(machineId: string) {
       where: { id: { in: batchIds } },
     });
   }
+
+  // Purge legacy o2 sensor records to prevent duplicate sensor entries
+  await prisma.sensor.deleteMany({
+    where: { machineId, sensorType: 'o2' },
+  });
 
   // Also purge any orphaned sensor readings for sensors attached to this machine
   const sensors = await prisma.sensor.findMany({
@@ -76,25 +81,34 @@ async function ensureSensors(machineId: string): Promise<Record<string, string>>
   return sensorMap;
 }
 
-function generateReadings({
+interface PhaseDefinition {
+  name: string;
+  timestamp: Date;
+}
+
+interface LatestTargets {
+  temperature: number;
+  moisture: number;
+  oxygen: number;
+  co2: number;
+}
+
+function generatePhaseAwareReadings({
   batchId,
   sensorMap,
-  endTime,
-  totalSteps = 48,
-  stepIntervalMs = 30 * 60 * 1000,
-  targets,
+  startDate,
+  endDate,
+  phases,
+  stepIntervalHours = 2,
+  latestTargets,
 }: {
   batchId: string;
   sensorMap: Record<string, string>;
-  endTime: Date;
-  totalSteps?: number;
-  stepIntervalMs?: number;
-  targets: {
-    temperature: { min: number; max: number; current: number };
-    moisture: { min: number; max: number; current: number };
-    o2: { min: number; max: number; current: number };
-    co2: { min: number; max: number; current: number };
-  };
+  startDate: Date;
+  endDate: Date;
+  phases: PhaseDefinition[];
+  stepIntervalHours?: number;
+  latestTargets?: LatestTargets;
 }) {
   const readings: {
     batchId: string;
@@ -103,22 +117,68 @@ function generateReadings({
     value: number;
   }[] = [];
 
-  for (let step = totalSteps; step >= 0; step--) {
-    const timestamp = new Date(endTime.getTime() - step * stepIntervalMs);
-    const isLatest = step === 0;
+  const PHASE_TARGETS = {
+    mesophilic: {
+      temperature: { min: 35.0, max: 45.0 },
+      moisture: { min: 55.0, max: 65.0 },
+      oxygen: { min: 12.0, max: 18.0 },
+      co2: { min: 400.0, max: 600.0 },
+    },
+    thermophilic: {
+      temperature: { min: 55.0, max: 65.0 },
+      moisture: { min: 50.0, max: 60.0 },
+      oxygen: { min: 10.0, max: 15.0 },
+      co2: { min: 600.0, max: 800.0 },
+    },
+    cooling: {
+      temperature: { min: 25.0, max: 35.0 },
+      moisture: { min: 40.0, max: 50.0 },
+      oxygen: { min: 16.0, max: 20.0 },
+      co2: { min: 400.0, max: 500.0 },
+    },
+  };
+
+  const getPhaseTargets = (t: Date) => {
+    let activePhase = phases[0]?.name?.toLowerCase() || 'mesophilic';
+    for (const p of phases) {
+      if (t.getTime() >= p.timestamp.getTime()) {
+        activePhase = p.name.toLowerCase();
+      }
+    }
+    if (activePhase.includes('thermo')) return PHASE_TARGETS.thermophilic;
+    if (activePhase.includes('cool')) return PHASE_TARGETS.cooling;
+    return PHASE_TARGETS.mesophilic;
+  };
+
+  const stepIntervalMs = stepIntervalHours * 60 * 60 * 1000;
+  const timestamps: Date[] = [];
+  let curr = startDate.getTime();
+  const end = endDate.getTime();
+
+  while (curr < end) {
+    timestamps.push(new Date(curr));
+    curr += stepIntervalMs;
+  }
+  if (timestamps.length === 0 || timestamps[timestamps.length - 1].getTime() !== end) {
+    timestamps.push(new Date(end));
+  }
+
+  for (let i = 0; i < timestamps.length; i++) {
+    const timestamp = timestamps[i];
+    const isLatest = i === timestamps.length - 1;
+    const targets = getPhaseTargets(timestamp);
 
     for (const conf of SENSOR_CONFIGS) {
-      const target = targets[conf.type as keyof typeof targets];
+      const typeKey = conf.type as keyof LatestTargets;
       let val: number;
 
-      if (isLatest) {
-        val = target.current;
+      if (isLatest && latestTargets && latestTargets[typeKey] !== undefined) {
+        val = latestTargets[typeKey];
       } else {
-        const span = target.max - target.min;
+        const targetRange = targets[typeKey];
+        const span = targetRange.max - targetRange.min;
         const variance = (Math.random() - 0.5) * span * 0.4;
-        val = parseFloat(
-          (target.min + span * 0.5 + variance).toFixed(1),
-        );
+        val = parseFloat((targetRange.min + span * 0.5 + variance).toFixed(1));
       }
 
       readings.push({
@@ -342,15 +402,21 @@ async function main() {
     },
   });
 
-  const readings1 = generateReadings({
+  const readings1 = generatePhaseAwareReadings({
     batchId: batch1.id,
     sensorMap: sensors1,
-    endTime: new Date(), // Live fresh up to Date.now()
-    targets: {
-      temperature: { min: 55.0, max: 58.0, current: 56.8 },
-      moisture: { min: 59.0, max: 61.0, current: 60.0 },
-      o2: { min: 15.5, max: 16.5, current: 16.0 },
-      co2: { min: 640.0, max: 660.0, current: 650.0 },
+    startDate: m1StartDate,
+    endDate: new Date(),
+    phases: [
+      { name: 'Mesophilic Phase', timestamp: m1StartDate },
+      { name: 'Thermophilic Phase', timestamp: m1Phase1End },
+    ],
+    stepIntervalHours: 2,
+    latestTargets: {
+      temperature: 56.8,
+      moisture: 60.0,
+      oxygen: 16.0,
+      co2: 650.0,
     },
   });
   await prisma.sensorReading.createMany({ data: readings1 });
@@ -407,15 +473,22 @@ async function main() {
     },
   });
 
-  const readings2 = generateReadings({
+  const readings2 = generatePhaseAwareReadings({
     batchId: batch2.id,
     sensorMap: sensors2,
-    endTime: m2CompletionDate, // Readings ending at batch completion (1 day ago)
-    targets: {
-      temperature: { min: 30.0, max: 35.0, current: 31.5 },
-      moisture: { min: 40.0, max: 45.0, current: 42.0 },
-      o2: { min: 18.0, max: 20.0, current: 19.5 },
-      co2: { min: 450.0, max: 500.0, current: 460.0 },
+    startDate: m2StartDate,
+    endDate: m2CompletionDate,
+    phases: [
+      { name: 'Mesophilic Phase', timestamp: m2StartDate },
+      { name: 'Thermophilic Phase', timestamp: m2Phase1End },
+      { name: 'Cooling Phase', timestamp: m2Phase2End },
+    ],
+    stepIntervalHours: 2,
+    latestTargets: {
+      temperature: 31.5,
+      moisture: 42.0,
+      oxygen: 19.5,
+      co2: 460.0,
     },
   });
   await prisma.sensorReading.createMany({ data: readings2 });
@@ -474,15 +547,21 @@ async function main() {
     },
   });
 
-  const readings4 = generateReadings({
+  const readings4 = generatePhaseAwareReadings({
     batchId: batch4.id,
     sensorMap: sensors4,
-    endTime: m4OfflineDate, // Outdated readings ending 3 days ago
-    targets: {
-      temperature: { min: 50.0, max: 54.0, current: 52.0 },
-      moisture: { min: 55.0, max: 60.0, current: 58.0 },
-      o2: { min: 14.0, max: 16.0, current: 15.0 },
-      co2: { min: 700.0, max: 750.0, current: 720.0 },
+    startDate: m4StartDate,
+    endDate: m4OfflineDate,
+    phases: [
+      { name: 'Mesophilic Phase', timestamp: m4StartDate },
+      { name: 'Thermophilic Phase', timestamp: m4Phase1End },
+    ],
+    stepIntervalHours: 2,
+    latestTargets: {
+      temperature: 52.0,
+      moisture: 58.0,
+      oxygen: 15.0,
+      co2: 720.0,
     },
   });
   await prisma.sensorReading.createMany({ data: readings4 });
