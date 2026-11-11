@@ -155,8 +155,7 @@ The script runs a single PostgreSQL transaction that cascadingly deletes all rel
 2. `sensors`
 3. `batch_feedstocks`
 4. `composting_phases`
-5. `compost_outputs`
-6. `compost_batches`
-7. `telemetry_logs`
-8. `machines`
+5. `compost_batches`
+6. `telemetry_logs`
+7. `machines`
 

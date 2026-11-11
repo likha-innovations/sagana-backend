@@ -41,7 +41,6 @@ erDiagram
     machines ||--o{ telemetry_logs : "records"
     compost_batches ||--o{ batch_feedstocks : "includes"
     feedstocks ||--o{ batch_feedstocks : "categorizes"
-    compost_batches ||--o| compost_outputs : "yields"
     compost_batches ||--o{ composting_phases : "progresses through"
     compost_batches ||--o{ sensor_readings : "captures"
     sensors ||--o{ sensor_readings : "measures"
@@ -91,6 +90,7 @@ erDiagram
         string machineId FK
         string userId FK
         float totalWeight "Total biomass kg"
+        float finalWeight "Harvest yield kg (optional)"
         string batchCode UK
         datetime startDate
         datetime completionDate
@@ -112,21 +112,11 @@ erDiagram
         float weight "kg"
     }
 
-    compost_outputs {
-        string id PK "cuid"
-        string batchId FK UK
-        float outputWeight "kg"
-        datetime productionDate
-        datetime collectionDate
-        string status "active"
-    }
-
     composting_phases {
         string id PK "cuid"
         string batchId FK
         string phaseName "Mesophilic | Thermophilic"
-        datetime startTime
-        datetime endTime
+        datetime timestamp
         string status "active"
     }
 

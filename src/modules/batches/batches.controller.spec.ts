@@ -41,11 +41,20 @@ describe('BatchesController', () => {
     await controller.list('user');
     await controller.get('user', 'batch');
     await controller.create('user', input);
-    await controller.finish('user', 'batch', { outputWeight: 1 });
+    await controller.finish('user', 'batch', { finalWeight: 14.2 });
+    await controller.finish('user', 'batch', { outputWeight: 10 });
+    await controller.finish('user', 'batch', {});
     expect(service.list).toHaveBeenCalledWith('user');
     expect(service.get).toHaveBeenCalledWith('user', 'batch');
     expect(service.create).toHaveBeenCalledWith('user', input);
-    expect(service.finish).toHaveBeenCalledWith('user', 'batch', 1);
+    expect(service.finish).toHaveBeenNthCalledWith(1, 'user', 'batch', 14.2);
+    expect(service.finish).toHaveBeenNthCalledWith(2, 'user', 'batch', 10);
+    expect(service.finish).toHaveBeenNthCalledWith(
+      3,
+      'user',
+      'batch',
+      undefined,
+    );
   });
 
   it('rejects invalid batch creation and finish bodies', () => {
@@ -63,9 +72,18 @@ describe('BatchesController', () => {
         ],
       }),
     ).toThrow(BadRequestException);
+    expect(() => finish.transform({ finalWeight: -1 })).toThrow(
+      BadRequestException,
+    );
     expect(() => finish.transform({ outputWeight: -1 })).toThrow(
       BadRequestException,
     );
+    expect(finish.transform({ finalWeight: 14.2 })).toEqual({
+      finalWeight: 14.2,
+    });
+    expect(finish.transform({ outputWeight: 14.2 })).toEqual({
+      outputWeight: 14.2,
+    });
     expect(finish.transform({})).toEqual({});
   });
 

@@ -49,5 +49,5 @@ Returns all active feedstocks sorted for display during batch setup.
 When operators log composting batches via mobile clients:
 1. `Feedstock` items are chosen and assigned individual weights (`BatchFeedstock`).
 2. The initial biomass total is computed as the sum of all component feedstock weights.
-3. Final compost yield is tracked separately in `CompostOutput`.
+3. Final compost yield is tracked directly on the batch as `finalWeight` upon completion.
 
