@@ -1,0 +1,26 @@
+meta {
+  name: Update Operator Status
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/operators/:id/status
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: user_123
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "status": "suspended"
+  }
+}
+
