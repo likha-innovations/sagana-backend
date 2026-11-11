@@ -9,12 +9,8 @@ import {
 } from '@nestjs/swagger';
 import { AdminOnly } from '../../core/decorators/admin-only.decorator';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
-import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 import { UsersService } from './users.service';
-import {
-  UpdateOperatorStatusDto,
-  UpdateOperatorStatusSchema,
-} from './dto/update-operator-status.dto';
+import { UpdateOperatorStatusDto } from './dto/update-operator-status.dto';
 import {
   ApiErrorExample,
   profileExample,
@@ -100,8 +96,7 @@ export class UsersAdminController {
   updateOperatorStatus(
     @CurrentUserId() userId: string,
     @Param('id') operatorId: string,
-    @Body(new ZodValidationPipe(UpdateOperatorStatusSchema))
-    body: UpdateOperatorStatusDto,
+    @Body() body: UpdateOperatorStatusDto,
   ) {
     return this.usersService.updateOperatorStatus(
       userId,

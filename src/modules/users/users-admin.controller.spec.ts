@@ -7,6 +7,7 @@ import request from 'supertest';
 import { AppController } from '../../app.controller';
 import { ClerkAuthGuard } from '../../core/guards/clerk-auth.guard';
 import { TransformResponseInterceptor } from '../../core/interceptors/transform-response.interceptor';
+import { ZodValidationPipe } from 'nestjs-zod';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { BatchesController } from '../batches/batches.controller';
@@ -118,6 +119,7 @@ describe('Admin authorization', () => {
       ],
     }).compile();
     app = module.createNestApplication();
+    app.useGlobalPipes(new ZodValidationPipe());
     app.useGlobalInterceptors(new TransformResponseInterceptor());
     await app.init();
   });

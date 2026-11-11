@@ -8,46 +8,12 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { z } from 'zod';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
-import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 import { BatchesService } from './batches.service';
 import { ApiErrorExample } from '../../core/swagger/examples';
-
-const createSchema = z
-  .object({
-    machineId: z.string().min(1),
-    feedstocks: z
-      .array(
-        z.object({
-          id: z.string().min(1),
-          weight: z.number().finite().positive(),
-        }),
-      )
-      .min(1),
-  })
-  .refine(
-    (value) =>
-      new Set(value.feedstocks.map((item) => item.id)).size ===
-      value.feedstocks.length,
-    'Duplicate feedstocks',
-  );
-const finishSchema = z.object({
-  finalWeight: z.number().finite().nonnegative().optional(),
-  outputWeight: z.number().finite().nonnegative().optional(),
-});
-const historySchema = z
-  .object({
-    startDate: z.iso.datetime().optional(),
-    endDate: z.iso.datetime().optional(),
-    offset: z.coerce.number().int().min(0).max(100000).default(0),
-    limit: z.coerce.number().int().min(1).max(2000).default(200),
-  })
-  .refine(
-    (value) =>
-      !value.startDate || !value.endDate || value.startDate <= value.endDate,
-    'Invalid date range',
-  );
+import { CreateBatchDto } from './dto/create-batch.dto';
+import { FinishBatchDto } from './dto/finish-batch.dto';
+import { BatchHistoryQueryDto } from './dto/batch-history-query.dto';
 
 const batchExample = {
   id: 'batch123',
@@ -167,35 +133,12 @@ export class BatchesController {
       'Creates a batch and its feedstocks together. The machine must belong to the user’s barangay and cannot already have an active batch.',
   })
   @ApiBody({
+    type: CreateBatchDto,
     examples: {
       create: {
         value: {
           machineId: 'machine123',
           feedstocks: [{ id: 'feedstock123', weight: 20 }],
-        },
-      },
-    },
-    schema: {
-      type: 'object',
-      required: ['machineId', 'feedstocks'],
-      properties: {
-        machineId: { type: 'string', example: 'machine123' },
-        feedstocks: {
-          type: 'array',
-          minItems: 1,
-          items: {
-            type: 'object',
-            required: ['id', 'weight'],
-            properties: {
-              id: { type: 'string', example: 'feedstock123' },
-              weight: {
-                type: 'number',
-                minimum: 0,
-                exclusiveMinimum: true,
-                description: 'Weight in kilograms.',
-              },
-            },
-          },
         },
       },
     },
@@ -235,11 +178,7 @@ export class BatchesController {
     'The machine already has an active batch.',
     'Machine already has an active batch',
   )
-  create(
-    @CurrentUserId() userId: string,
-    @Body(new ZodValidationPipe(createSchema))
-    body: z.infer<typeof createSchema>,
-  ) {
+  create(@CurrentUserId() userId: string, @Body() body: CreateBatchDto) {
     return this.batches.create(userId, body);
   }
 
@@ -250,21 +189,7 @@ export class BatchesController {
   })
   @ApiParam({ name: 'id', description: 'Batch ID' })
   @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        finalWeight: {
-          type: 'number',
-          minimum: 0,
-          description: 'Optional measured final compost weight in kilograms.',
-        },
-        outputWeight: {
-          type: 'number',
-          minimum: 0,
-          description: 'Backwards-compatible alias for finalWeight.',
-        },
-      },
-    },
+    type: FinishBatchDto,
     examples: {
       withoutWeight: { summary: 'Finish without final weight', value: {} },
       withFinalWeight: {
@@ -305,8 +230,7 @@ export class BatchesController {
   finish(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(finishSchema))
-    body: z.infer<typeof finishSchema>,
+    @Body() body: FinishBatchDto,
   ) {
     const finalWeight = body.finalWeight ?? body.outputWeight;
     return this.batches.finish(userId, id, finalWeight);
@@ -366,8 +290,7 @@ export class BatchesController {
   machineReadings(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
-    @Query(new ZodValidationPipe(historySchema))
-    query: z.infer<typeof historySchema>,
+    @Query() query: BatchHistoryQueryDto,
   ) {
     return this.batches.history(userId, { machineId: id }, query);
   }
@@ -426,8 +349,7 @@ export class BatchesController {
   batchReadings(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
-    @Query(new ZodValidationPipe(historySchema))
-    query: z.infer<typeof historySchema>,
+    @Query() query: BatchHistoryQueryDto,
   ) {
     return this.batches.history(userId, { batchId: id }, query);
   }

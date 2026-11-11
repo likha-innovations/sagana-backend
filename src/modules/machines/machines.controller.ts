@@ -18,16 +18,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { MachinesService } from './machines.service';
-import {
-  RegisterMachineSchema,
-  type RegisterMachineDto,
-} from './dto/register-machine.dto';
-import {
-  UpdateMachineSchema,
-  UpdateMachineDto,
-} from './dto/update-machine.dto';
+import { RegisterMachineDto } from './dto/register-machine.dto';
+import { UpdateMachineDto } from './dto/update-machine.dto';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
-import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 import {
   ApiErrorExample,
   machineExample,
@@ -135,7 +128,7 @@ export class MachinesController {
   update(
     @CurrentUserId() userId: string,
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(UpdateMachineSchema)) dto: UpdateMachineDto,
+    @Body() dto: UpdateMachineDto,
   ) {
     return this.machinesService.update(userId, id, dto);
   }
@@ -181,17 +174,14 @@ export class MachinesController {
       'Registers a machine to the user’s barangay. An existing device in that barangay is re-provisioned; a device assigned to another barangay causes a conflict.',
   })
   @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['name', 'macAddress', 'wifiSsid'],
-      properties: {
-        name: { type: 'string', minLength: 1, example: 'Composter 1' },
-        macAddress: {
-          type: 'string',
-          description: 'MAC address or UUID device identifier.',
-          example: 'AA:BB:CC:DD:EE:FF',
+    type: RegisterMachineDto,
+    examples: {
+      register: {
+        value: {
+          name: 'Composter 1',
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          wifiSsid: 'SaganaNet',
         },
-        wifiSsid: { type: 'string', minLength: 1, example: 'SaganaNet' },
       },
     },
   })
@@ -224,7 +214,7 @@ export class MachinesController {
   )
   async register(
     @CurrentUserId() userId: string,
-    @Body(new ZodValidationPipe(RegisterMachineSchema)) dto: RegisterMachineDto,
+    @Body() dto: RegisterMachineDto,
   ) {
     return this.machinesService.register(userId, dto);
   }
