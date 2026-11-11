@@ -10,6 +10,7 @@ DROP COLUMN "start_time",
 ADD COLUMN "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- AlterTable
+ALTER TABLE IF EXISTS "aivsp_machines" RENAME TO "machines";
 ALTER TABLE "machines" ALTER COLUMN "status" SET DEFAULT 'offline';
 
 -- DropTable
