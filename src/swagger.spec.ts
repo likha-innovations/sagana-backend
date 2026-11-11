@@ -67,6 +67,7 @@ describe('Swagger documentation', () => {
       ['delete', '/machines/{id}', 'Machines', 'Shared'],
       ['post', '/machines/register', 'Machines', 'Shared'],
       ['get', '/operators', 'Users', 'Admin'],
+      ['patch', '/operators/{id}/status', 'Users', 'Admin'],
       ['get', '/batches', 'Batches', 'Shared'],
       ['post', '/batches', 'Batches', 'Shared'],
       ['get', '/batches/{id}', 'Batches', 'Shared'],

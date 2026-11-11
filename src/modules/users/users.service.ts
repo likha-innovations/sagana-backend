@@ -161,6 +161,38 @@ export class UsersService {
     });
   }
 
+  async updateOperatorStatus(
+    userId: string,
+    operatorId: string,
+    status: 'active' | 'suspended',
+  ) {
+    const admin = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { barangayId: true },
+    });
+    if (!admin?.barangayId) {
+      throw new ForbiddenException('Admin barangay required');
+    }
+
+    const operator = await this.prisma.user.findFirst({
+      where: {
+        id: operatorId,
+        role: 'operator',
+        barangayId: admin.barangayId,
+      },
+    });
+
+    if (!operator) {
+      throw new NotFoundException('Operator not found in your barangay');
+    }
+
+    return this.prisma.user.update({
+      where: { id: operatorId },
+      data: { status },
+      include: { barangay: barangayProfile },
+    });
+  }
+
   async assignBarangay(userId: string, input: unknown) {
     const code = normalizeBarangayCode(input);
     await this.getProfile(userId);

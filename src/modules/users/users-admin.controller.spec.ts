@@ -48,6 +48,21 @@ describe('Admin authorization', () => {
       findUnique: jest.fn(({ where }: { where: { id: string } }) =>
         Promise.resolve(users[where.id] ?? null),
       ),
+      findFirst: jest.fn(
+        ({
+          where,
+        }: {
+          where: { id: string; role?: string; barangayId?: string };
+        }) =>
+          Promise.resolve(
+            operators.find(
+              (user) =>
+                user.id === where.id &&
+                (!where.barangayId || user.barangayId === where.barangayId) &&
+                (!where.role || user.role === where.role),
+            ) ?? null,
+          ),
+      ),
       findMany: jest.fn(
         ({ where }: { where: { barangayId: string; role: string } }) =>
           Promise.resolve(
@@ -64,8 +79,12 @@ describe('Admin authorization', () => {
           data,
         }: {
           where: { id: string };
-          data: { barangayId?: string };
-        }) => Promise.resolve({ ...users[where.id], ...data }),
+          data: { barangayId?: string; status?: string };
+        }) => {
+          const target =
+            users[where.id] ?? operators.find((op) => op.id === where.id);
+          return Promise.resolve({ ...target, ...data });
+        },
       ),
     },
   };
@@ -136,8 +155,46 @@ describe('Admin authorization', () => {
         .auth(userId, { type: 'bearer' })
         .expect(403);
       expect(prisma.user.findMany).not.toHaveBeenCalled();
+
+      await request(app.getHttpServer())
+        .patch('/operators/one/status')
+        .auth(userId, { type: 'bearer' })
+        .send({ status: 'suspended' })
+        .expect(403);
     },
   );
+
+  it('updates operator status when requested by admin for same-barangay operator', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/operators/one/status')
+      .auth('admin', { type: 'bearer' })
+      .send({ status: 'suspended' })
+      .expect(200);
+
+    expect(response.body.data.status).toBe('suspended');
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'one' },
+        data: { status: 'suspended' },
+      }),
+    );
+  });
+
+  it('rejects invalid status payloads with 400', async () => {
+    await request(app.getHttpServer())
+      .patch('/operators/one/status')
+      .auth('admin', { type: 'bearer' })
+      .send({ status: 'invalid_status' })
+      .expect(400);
+  });
+
+  it('returns 404 when updating operator from another barangay', async () => {
+    await request(app.getHttpServer())
+      .patch('/operators/two/status')
+      .auth('admin', { type: 'bearer' })
+      .send({ status: 'suspended' })
+      .expect(404);
+  });
   it('requires a valid token', async () => {
     await request(app.getHttpServer()).get('/operators').expect(401);
     await request(app.getHttpServer())
