@@ -1,6 +1,5 @@
-import { Controller, Post, Body, Param, UsePipes } from '@nestjs/common';
+import { Controller, Post, Body, Param } from '@nestjs/common';
 import { TelemetryService } from './telemetry.service';
-import { ZodValidationPipe } from 'nestjs-zod';
 import { PublishCommandDto } from './dto/publish-command.dto';
 import {
   ApiTags,
@@ -53,7 +52,6 @@ export class TelemetryController {
     'Authentication required.',
     'Authentication token missing',
   )
-  @UsePipes(ZodValidationPipe)
   sendCommand(
     @Param('deviceId') deviceId: string,
     @Body() command: PublishCommandDto,

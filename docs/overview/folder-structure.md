@@ -48,7 +48,6 @@ Shared infrastructure utilities that do not belong to any specific business doma
   * `admin.guard.ts`: Role-based access guard verifying admin role and barangay assignment.
 * **`interceptors/transform-response.interceptor.ts`**: Standardizes all successful responses into `{ success: true, data: T, timestamp }`.
 * **`logger/logger.service.ts`**: Custom console and asynchronous file logging with `Asia/Manila` timezones.
-* **`pipes/zod-validation.pipe.ts`**: Validates request payloads against Zod schemas.
 * **`swagger/examples.ts`**: Standardized Swagger schemas, DTOs, and error response examples.
 
 ---

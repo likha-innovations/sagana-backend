@@ -11,8 +11,7 @@ src/
 │   ├── exceptions/       # Global exception filter (global-exception.filter.ts)
 │   ├── guards/           # Global authentication guards (clerk-auth.guard.ts)
 │   ├── interceptors/     # Response transformation (transform-response.interceptor.ts)
-│   ├── logger/           # Structured LoggerService (logger.service.ts)
-│   └── pipes/            # Global validation pipes (ZodValidationPipe)
+│   └── logger/           # Structured LoggerService (logger.service.ts)
 │
 ├── infrastructure/       # 🔌 EXTERNAL DRIVERS & CONNECTIONS
 │   ├── database/         # PrismaService with @prisma/adapter-pg

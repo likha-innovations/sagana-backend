@@ -1,16 +1,7 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Post,
-  Body,
-  UsePipes,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
-import { ZodValidationPipe } from 'nestjs-zod';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
   ApiTags,
@@ -90,7 +81,6 @@ export class UsersOperatorController {
     'Authentication token missing',
   )
   @ApiErrorExample(404, 'User profile not found.', 'User profile not found')
-  @UsePipes(ZodValidationPipe)
   updateProfile(
     @CurrentUserId() userId: string,
     @Body() data: UpdateProfileDto,

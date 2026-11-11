@@ -20,7 +20,7 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
 ## Architecture & Conventions
 
 - **Modular Monolith**:
-  - `src/core/`: Shared guards (`ClerkAuthGuard`), pipes (`ZodValidationPipe`), interceptors, logger (`LoggerService`), exception filters, rate limiting (`ThrottlerModule`), and env validation (`zod/v4`).
+  - `src/core/`: Shared guards (`ClerkAuthGuard`), interceptors, logger (`LoggerService`), exception filters, rate limiting (`ThrottlerModule`), and env validation (`zod/v4`).
   - `src/infrastructure/`:
     - Database module & Prisma client service (`PrismaService` with `@prisma/adapter-pg`).
     - MQTT module (`MqttService` managing broker connection, topic subscriptions, and publishing commands).

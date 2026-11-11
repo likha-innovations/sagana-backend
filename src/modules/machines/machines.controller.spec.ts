@@ -9,6 +9,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { ClerkAuthGuard } from '../../core/guards/clerk-auth.guard';
 import { TransformResponseInterceptor } from '../../core/interceptors/transform-response.interceptor';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 jest.mock('@clerk/backend', () => ({ verifyToken: jest.fn() }));
 
@@ -53,6 +54,7 @@ describe('Machine read access', () => {
       ],
     }).compile();
     app = module.createNestApplication();
+    app.useGlobalPipes(new ZodValidationPipe());
     app.useGlobalInterceptors(new TransformResponseInterceptor());
     await app.init();
   });

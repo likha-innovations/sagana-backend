@@ -1,10 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
-import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { Test } from '@nestjs/testing';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { BatchesController } from './batches.controller';
 import { BatchesService } from './batches.service';
-import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
+import { CreateBatchSchema } from './dto/create-batch.dto';
+import { FinishBatchSchema } from './dto/finish-batch.dto';
+import { BatchHistoryQuerySchema } from './dto/batch-history-query.dto';
 
 describe('BatchesController', () => {
   const service = {
@@ -17,19 +17,6 @@ describe('BatchesController', () => {
   const controller = new BatchesController(
     service as unknown as BatchesService,
   );
-  const pipeFor = (method: keyof BatchesController) => {
-    const args = Reflect.getMetadata(
-      ROUTE_ARGS_METADATA,
-      BatchesController,
-      method,
-    ) as Record<string, { pipes: unknown[] }>;
-    const pipe = Object.values(args)
-      .flatMap((arg) => arg.pipes)
-      .find((item) => item instanceof ZodValidationPipe);
-    if (!(pipe instanceof ZodValidationPipe))
-      throw new Error(`Missing validation pipe for ${method}`);
-    return pipe;
-  };
 
   beforeEach(() => jest.resetAllMocks());
 
@@ -58,41 +45,35 @@ describe('BatchesController', () => {
   });
 
   it('rejects invalid batch creation and finish bodies', () => {
-    const create = pipeFor('create');
-    const finish = pipeFor('finish');
-    expect(() => create.transform({ machineId: 'm', feedstocks: [] })).toThrow(
-      BadRequestException,
-    );
-    expect(() =>
-      create.transform({
+    expect(
+      CreateBatchSchema.safeParse({ machineId: 'm', feedstocks: [] }).success,
+    ).toBe(false);
+    expect(
+      CreateBatchSchema.safeParse({
         machineId: 'm',
         feedstocks: [
           { id: 'f', weight: 1 },
           { id: 'f', weight: 2 },
         ],
-      }),
-    ).toThrow(BadRequestException);
-    expect(() => finish.transform({ finalWeight: -1 })).toThrow(
-      BadRequestException,
+      }).success,
+    ).toBe(false);
+    expect(FinishBatchSchema.safeParse({ finalWeight: -1 }).success).toBe(
+      false,
     );
-    expect(() => finish.transform({ outputWeight: -1 })).toThrow(
-      BadRequestException,
+    expect(FinishBatchSchema.safeParse({ outputWeight: -1 }).success).toBe(
+      false,
     );
-    expect(finish.transform({ finalWeight: 14.2 })).toEqual({
+    expect(FinishBatchSchema.parse({ finalWeight: 14.2 })).toEqual({
       finalWeight: 14.2,
     });
-    expect(finish.transform({ outputWeight: 14.2 })).toEqual({
+    expect(FinishBatchSchema.parse({ outputWeight: 14.2 })).toEqual({
       outputWeight: 14.2,
     });
-    expect(finish.transform({})).toEqual({});
+    expect(FinishBatchSchema.parse({})).toEqual({});
   });
 
   it('validates and forwards scoped history queries', async () => {
-    const pipe = pipeFor('machineReadings');
-    const query = pipe.transform({ limit: '50', offset: '2' }) as {
-      limit: number;
-      offset: number;
-    };
+    const query = BatchHistoryQuerySchema.parse({ limit: '50', offset: '2' });
     await controller.machineReadings('user', 'machine', query);
     await controller.batchReadings('user', 'batch', query);
     expect(service.history).toHaveBeenNthCalledWith(
@@ -107,15 +88,15 @@ describe('BatchesController', () => {
       { batchId: 'batch' },
       query,
     );
-    expect(() => pipe.transform({ limit: '2001' })).toThrow(
-      BadRequestException,
+    expect(BatchHistoryQuerySchema.safeParse({ limit: '2001' }).success).toBe(
+      false,
     );
-    expect(() =>
-      pipe.transform({
+    expect(
+      BatchHistoryQuerySchema.safeParse({
         startDate: '2026-01-02T00:00:00Z',
         endDate: '2026-01-01T00:00:00Z',
-      }),
-    ).toThrow(BadRequestException);
+      }).success,
+    ).toBe(false);
   });
 
   it.each([

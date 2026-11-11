@@ -11,9 +11,10 @@ import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { MachinesModule } from './modules/machines/machines.module';
 import { BarangaysModule } from './modules/barangays/barangays.module';
 import { FeedstocksModule } from './modules/feedstocks/feedstocks.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
 import { BatchesModule } from './modules/batches/batches.module';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 @Module({
   imports: [
@@ -43,6 +44,10 @@ import { BatchesModule } from './modules/batches/batches.module';
     {
       provide: APP_GUARD,
       useClass: ClerkAuthGuard,
+    },
+    {
+      provide: APP_PIPE,
+      useClass: ZodValidationPipe,
     },
   ],
 })
