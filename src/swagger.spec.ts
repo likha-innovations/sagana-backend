@@ -63,6 +63,8 @@ describe('Swagger documentation', () => {
       ['post', '/barangays/code/rotate', 'Barangays', 'Admin'],
       ['get', '/machines', 'Machines', 'Shared'],
       ['get', '/machines/{id}', 'Machines', 'Shared'],
+      ['get', '/machines/{id}/overview', 'Machines', 'Shared'],
+      ['get', '/machines/{id}/automation-logs', 'Machines', 'Shared'],
       ['patch', '/machines/{id}', 'Machines', 'Shared'],
       ['delete', '/machines/{id}', 'Machines', 'Shared'],
       ['post', '/machines/register', 'Machines', 'Shared'],

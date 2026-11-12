@@ -37,6 +37,15 @@ describe('TelemetryService', () => {
             telemetryLog: {
               create: jest.fn(),
             },
+            automationLog: {
+              create: jest.fn().mockImplementation(({ data }) =>
+                Promise.resolve({
+                  id: 'log_1',
+                  createdAt: new Date(),
+                  ...data,
+                }),
+              ),
+            },
           },
         },
         {
@@ -45,12 +54,17 @@ describe('TelemetryService', () => {
         },
         {
           provide: TelemetryGateway,
-          useValue: gateway,
+          useValue: {
+            broadcastTelemetry: jest.fn(),
+            broadcastStatus: jest.fn(),
+            broadcastAutomationLog: jest.fn(),
+          },
         },
       ],
     }).compile();
 
     service = module.get<TelemetryService>(TelemetryService);
+    gateway = module.get<TelemetryGateway>(TelemetryGateway);
   });
 
   it('should be defined', () => {
@@ -74,5 +88,80 @@ describe('TelemetryService', () => {
     );
     expect(result.success).toBe(true);
     expect(result.macAddress).toBe('AA:BB:CC:DD:EE:FF');
+  });
+
+  it('should ingest discrete automation events and broadcast them', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+
+    const eventPayload = Buffer.from(
+      JSON.stringify({
+        type: 'blower_on',
+        message:
+          'The air blower has been turned on and will be running for 5 minutes.',
+        metadata: { durationMinutes: 5 },
+      }),
+    );
+
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+      eventPayload,
+    );
+
+    expect(prisma.automationLog.create).toHaveBeenCalledWith({
+      data: {
+        machineId: 'machine_1',
+        batchId: 'batch_1',
+        type: 'blower_on',
+        message:
+          'The air blower has been turned on and will be running for 5 minutes.',
+        metadata: { durationMinutes: 5 },
+      },
+    });
+
+    expect(gateway.broadcastAutomationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        machineId: 'machine_1',
+        type: 'blower_on',
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+      }),
+    );
+  });
+
+  it('should auto-synthesize event message if omitted in payload', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [],
+    });
+
+    const eventPayload = Buffer.from(
+      JSON.stringify({
+        type: 'sprinkler_off',
+        targetMoisture: 60,
+      }),
+    );
+
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+      eventPayload,
+    );
+
+    expect(prisma.automationLog.create).toHaveBeenCalledWith({
+      data: {
+        machineId: 'machine_1',
+        batchId: null,
+        type: 'sprinkler_off',
+        message: 'The sprinkler has been turned off as it already reached 60%.',
+        metadata: { type: 'sprinkler_off', targetMoisture: 60 },
+      },
+    });
   });
 });

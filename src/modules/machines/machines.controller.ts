@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -20,6 +21,7 @@ import {
 import { MachinesService } from './machines.service';
 import { RegisterMachineDto } from './dto/register-machine.dto';
 import { UpdateMachineDto } from './dto/update-machine.dto';
+import { AutomationLogsQueryDto } from './dto/automation-logs-query.dto';
 import { CurrentUserId } from '../../core/decorators/current-user.decorator';
 import {
   ApiErrorExample,
@@ -88,6 +90,90 @@ export class MachinesController {
   )
   findOne(@CurrentUserId() userId: string, @Param('id') id: string) {
     return this.machinesService.findOne(userId, id);
+  }
+
+  @Get(':id/overview')
+  @ApiOperation({
+    summary: '[Shared] Get machine overview and live automation state',
+    description:
+      'Returns current active batch details and live automation targets (aeration and sprinkler status).',
+  })
+  @ApiParam({ name: 'id', description: 'Machine ID', example: 'machine123' })
+  @ApiResponse({
+    status: 200,
+    description: 'Machine overview returned.',
+    content: {
+      'application/json': {
+        example: successExample({
+          machineId: 'machine123',
+          batchId: 'batch123',
+          currentWeight: 32.5,
+          recordedAt: '2026-11-12T14:00:00.000Z',
+          automations: [
+            { kind: 'aeration', enabled: true, until: '6:07' },
+            { kind: 'sprinkler', enabled: false, until: '45%' },
+          ],
+        }),
+      },
+    },
+  })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
+  getOverview(@CurrentUserId() userId: string, @Param('id') id: string) {
+    return this.machinesService.getOverview(userId, id);
+  }
+
+  @Get(':id/automation-logs')
+  @ApiOperation({
+    summary: '[Shared] Get machine automation logs',
+    description:
+      'Returns historical automation and actuator events (blower, sprinkler, emergency stop) for a machine.',
+  })
+  @ApiParam({ name: 'id', description: 'Machine ID', example: 'machine123' })
+  @ApiResponse({
+    status: 200,
+    description: 'Automation logs returned.',
+    content: {
+      'application/json': {
+        example: successExample([
+          {
+            id: 'log123',
+            machineId: 'machine123',
+            batchId: 'batch123',
+            type: 'blower_on',
+            message:
+              'The air blower has been turned on and will be running for 5 minutes.',
+            metadata: { durationMinutes: 5 },
+            createdAt: '2026-11-12T14:00:00.000Z',
+          },
+        ]),
+      },
+    },
+  })
+  @ApiErrorExample(
+    401,
+    'Authentication required.',
+    'Authentication token missing',
+  )
+  @ApiErrorExample(
+    404,
+    'User or accessible machine not found.',
+    'Machine not found',
+  )
+  getAutomationLogs(
+    @CurrentUserId() userId: string,
+    @Param('id') id: string,
+    @Query() query: AutomationLogsQueryDto,
+  ) {
+    return this.machinesService.getAutomationLogs(userId, id, query);
   }
 
   @Patch(':id')

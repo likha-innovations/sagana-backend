@@ -41,6 +41,16 @@ describe('Machine read access', () => {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    compostBatch: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    telemetryLog: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    automationLog: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   };
 
   beforeAll(async () => {
@@ -265,5 +275,69 @@ describe('Machine read access', () => {
       .auth('valid', { type: 'bearer' })
       .send({ wifiSsid: '' })
       .expect(400);
+  });
+
+  describe('GET /machines/:id/overview', () => {
+    it('returns machine overview with active batch and automations', async () => {
+      prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
+      prisma.compostBatch.findFirst.mockResolvedValue({
+        id: 'batch_neo2',
+        totalWeight: 35.5,
+      });
+      prisma.telemetryLog.findFirst.mockResolvedValue({
+        recordedAt: new Date('2026-11-12T10:00:00Z'),
+        payload: {
+          actuators: {
+            blower_running: true,
+            pump_running: false,
+          },
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/machines/neo2/overview')
+        .auth('valid', { type: 'bearer' })
+        .expect(200);
+
+      expect(response.body.data).toMatchObject({
+        machineId: 'neo2',
+        batchId: 'batch_neo2',
+        currentWeight: 35.5,
+        automations: [
+          { kind: 'aeration', enabled: true },
+          { kind: 'sprinkler', enabled: false },
+        ],
+      });
+    });
+  });
+
+  describe('GET /machines/:id/automation-logs', () => {
+    it('returns list of automation logs for accessible machine', async () => {
+      prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
+      prisma.automationLog.findMany.mockResolvedValue([
+        {
+          id: 'log_1',
+          machineId: 'neo2',
+          batchId: 'batch_neo2',
+          type: 'blower_on',
+          message:
+            'The air blower has been turned on and will be running for 5 minutes.',
+          metadata: { durationMinutes: 5 },
+          createdAt: new Date('2026-11-12T10:00:00Z'),
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/machines/neo2/automation-logs')
+        .auth('valid', { type: 'bearer' })
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0]).toMatchObject({
+        id: 'log_1',
+        machineId: 'neo2',
+        type: 'blower_on',
+      });
+    });
   });
 });

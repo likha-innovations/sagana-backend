@@ -113,6 +113,19 @@ export class TelemetryGateway
     this.logger.log(`📤 [Socket.IO Emitted] Event 'telemetry': ${payloadStr}`);
   }
 
+  // Emits discrete automation log event (blower, sprinkler, e-stop) to all mobile clients
+  broadcastAutomationLog(data: unknown) {
+    if (!this.server) return;
+    const payloadStr =
+      typeof data === 'object' && data !== null
+        ? JSON.stringify(data)
+        : String(data);
+    this.server.emit('automation_log', data);
+    this.logger.log(
+      `📤 [Socket.IO Emitted] Event 'automation_log': ${payloadStr}`,
+    );
+  }
+
   // Receives custom command from mobile client and dispatches it to the target device's MQTT topic
   @SubscribeMessage('command')
   async handleCommand(
