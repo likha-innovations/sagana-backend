@@ -47,10 +47,11 @@ model Machine {
   createdAt  DateTime  @default(now()) @map("created_at")
   removedAt  DateTime? @map("removed_at")
 
-  barangay      Barangay       @relation(fields: [barangayId], references: [id])
-  batches       CompostBatch[]
-  sensors       Sensor[]
-  telemetryLogs TelemetryLog[]
+  barangay       Barangay        @relation(fields: [barangayId], references: [id])
+  batches        CompostBatch[]
+  sensors        Sensor[]
+  telemetryLogs  TelemetryLog[]
+  automationLogs AutomationLog[]
 
   @@map("machines")
 }
@@ -65,6 +66,23 @@ model TelemetryLog {
   machine Machine @relation(fields: [machineId], references: [id])
 
   @@map("telemetry_logs")
+}
+
+model AutomationLog {
+  id        String   @id @default(cuid()) @map("log_id")
+  machineId String   @map("machine_id")
+  batchId   String?  @map("batch_id")
+  type      String   @map("type")
+  message   String   @map("message")
+  metadata  Json?    @map("metadata")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  machine Machine       @relation(fields: [machineId], references: [id])
+  batch   CompostBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([machineId, createdAt])
+  @@index([batchId, createdAt])
+  @@map("automation_logs")
 }
 
 model CompostBatch {
@@ -83,6 +101,7 @@ model CompostBatch {
   feedstocks       BatchFeedstock[]
   compostingPhases CompostingPhase[]
   sensorReadings   SensorReading[]
+  automationLogs   AutomationLog[]
 
   @@map("compost_batches")
 }

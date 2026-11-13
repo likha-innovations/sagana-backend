@@ -9,6 +9,7 @@ import { PublishCommandDto } from './dto/publish-command.dto';
 // Topic patterns
 const TELEMETRY_TOPIC_REGEX = /^sagana\/devices\/([^/]+)\/telemetry$/;
 const STATUS_TOPIC_REGEX = /^sagana\/devices\/([^/]+)\/status$/;
+const EVENT_TOPIC_REGEX = /^sagana\/devices\/([^/]+)\/events$/;
 
 @Injectable()
 export class TelemetryService implements OnModuleInit {
@@ -85,7 +86,68 @@ export class TelemetryService implements OnModuleInit {
         return;
       }
 
-      // 2. Sensor telemetry stream
+      // 2. Automation event stream (discrete state changes: blower, sprinkler, e-stop)
+      const eventMatch = EVENT_TOPIC_REGEX.exec(topic);
+      if (eventMatch) {
+        const macAddress = eventMatch[1];
+        let eventPayload: Record<string, unknown> = {};
+        try {
+          eventPayload = JSON.parse(rawString) as Record<string, unknown>;
+        } catch {
+          eventPayload = { raw: rawString };
+        }
+
+        const machine = await this.prisma.machine.findUnique({
+          where: { macAddress },
+          include: {
+            batches: {
+              where: { status: 'active' },
+              take: 1,
+            },
+          },
+        });
+
+        if (!machine) {
+          this.logger.warn(
+            `Received event from unknown MAC: ${macAddress}. Ignoring.`,
+            TelemetryService.name,
+          );
+          return;
+        }
+
+        const activeBatch = machine.batches[0];
+        const type = (eventPayload.type as string) || 'unknown';
+        const message =
+          (eventPayload.message as string) ||
+          this.formatAutomationMessage(type, eventPayload);
+        const metadata =
+          (eventPayload.metadata as Prisma.InputJsonObject) ??
+          (eventPayload as Prisma.InputJsonObject);
+
+        const log = await this.prisma.automationLog.create({
+          data: {
+            machineId: machine.id,
+            batchId: activeBatch?.id ?? null,
+            type,
+            message,
+            metadata,
+          },
+        });
+
+        this.logger.log(
+          `⚡ [Automation Event] MAC=${macAddress} (machineId=${machine.id}): ${type} - ${message}`,
+          TelemetryService.name,
+        );
+
+        this.telemetryGateway.broadcastAutomationLog({
+          ...log,
+          macAddress,
+          barangayId: machine.barangayId,
+        });
+        return;
+      }
+
+      // 3. Sensor telemetry stream
       const telemetryMatch = TELEMETRY_TOPIC_REGEX.exec(topic);
       if (!telemetryMatch) return;
 
@@ -164,5 +226,41 @@ export class TelemetryService implements OnModuleInit {
       action: command.action,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private formatAutomationMessage(
+    type: string,
+    payload: Record<string, unknown>,
+  ): string {
+    const rawDuration =
+      payload.durationMinutes ??
+      (typeof payload.durationSeconds === 'number'
+        ? Math.round(payload.durationSeconds / 60)
+        : undefined);
+    const duration =
+      typeof rawDuration === 'number' || typeof rawDuration === 'string'
+        ? String(rawDuration)
+        : undefined;
+
+    const rawMoisture = payload.targetMoisture ?? payload.moistureTarget;
+    const targetMoisture =
+      typeof rawMoisture === 'number' || typeof rawMoisture === 'string'
+        ? String(rawMoisture)
+        : undefined;
+
+    switch (type) {
+      case 'blower_on':
+        return `The air blower has been turned on and will be running for ${duration ?? '5'} minutes.`;
+      case 'blower_off':
+        return `The air blower has been turned off and will be turned off for ${duration ?? '15'} minutes.`;
+      case 'sprinkler_on':
+        return `The sprinkler has been turned on and will be running until moisture hits ${targetMoisture ?? '60'}%.`;
+      case 'sprinkler_off':
+        return `The sprinkler has been turned off as it already reached ${targetMoisture ?? '60'}%.`;
+      case 'emergency_stop':
+        return 'The air blower has been stopped due to an emergency.';
+      default:
+        return `Automation event: ${type}`;
+    }
   }
 }

@@ -10,6 +10,7 @@ import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
 import { TelemetryGateway } from '../telemetry/telemetry.gateway';
 import type { RegisterMachineDto } from './dto/register-machine.dto';
 import type { UpdateMachineDto } from './dto/update-machine.dto';
+import type { AutomationLogsQueryDto } from './dto/automation-logs-query.dto';
 
 @Injectable()
 export class MachinesService {
@@ -274,5 +275,129 @@ export class MachinesService {
     );
 
     return machine;
+  }
+
+  async getAutomationLogs(
+    userId: string,
+    machineId: string,
+    query: AutomationLogsQueryDto,
+  ) {
+    await this.findOne(userId, machineId);
+
+    const where: {
+      machineId: string;
+      type?: string;
+      createdAt?: { gte?: Date; lte?: Date };
+    } = { machineId };
+
+    if (query.type) {
+      where.type = query.type;
+    }
+
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) {
+        where.createdAt.gte = new Date(query.startDate);
+      }
+      if (query.endDate) {
+        where.createdAt.lte = query.endDate.includes('T')
+          ? new Date(query.endDate)
+          : new Date(`${query.endDate}T23:59:59.999Z`);
+      }
+    }
+
+    const logs = await this.prisma.automationLog.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: query.limit,
+      skip: query.offset,
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      machineId: log.machineId,
+      batchId: log.batchId,
+      type: log.type,
+      message: log.message,
+      metadata: log.metadata,
+      createdAt: log.createdAt.toISOString(),
+    }));
+  }
+
+  async getOverview(userId: string, machineId: string) {
+    const machine = await this.findOne(userId, machineId);
+
+    const activeBatch = await this.prisma.compostBatch.findFirst({
+      where: { machineId, status: 'active' },
+      orderBy: { startDate: 'desc' },
+    });
+
+    const latestTelemetry = await this.prisma.telemetryLog.findFirst({
+      where: { machineId },
+      orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
+    });
+
+    const telemetryPayload =
+      (latestTelemetry?.payload as Record<string, unknown> | null) ?? null;
+    const actuators =
+      (telemetryPayload?.actuators as Record<string, unknown> | null) ?? null;
+
+    const blowerRunning = Boolean(
+      actuators?.blower_running ||
+      (typeof actuators?.blower_speed_percent === 'number' &&
+        actuators.blower_speed_percent > 0),
+    );
+    const pumpRunning = Boolean(
+      actuators?.pump_running ||
+      (typeof actuators?.pump_speed_percent === 'number' &&
+        actuators.pump_speed_percent > 0),
+    );
+
+    const [latestBlowerLog, latestSprinklerLog] = await Promise.all([
+      this.prisma.automationLog.findFirst({
+        where: {
+          machineId,
+          type: { in: ['blower_on', 'blower_off', 'emergency_stop'] },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+      this.prisma.automationLog.findFirst({
+        where: {
+          machineId,
+          type: { in: ['sprinkler_on', 'sprinkler_off'] },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+
+    const blowerMeta =
+      (latestBlowerLog?.metadata as Record<string, unknown> | null) ?? null;
+    const sprinklerMeta =
+      (latestSprinklerLog?.metadata as Record<string, unknown> | null) ?? null;
+
+    const aerationUntil =
+      (blowerMeta?.until as string) || (blowerRunning ? '6:07' : '15 min');
+
+    const sprinklerUntil =
+      (sprinklerMeta?.until as string) || (pumpRunning ? '60%' : '45%');
+
+    return {
+      machineId: machine.id,
+      batchId: activeBatch?.id ?? null,
+      currentWeight: activeBatch?.totalWeight ?? null,
+      recordedAt: (latestTelemetry?.recordedAt ?? new Date()).toISOString(),
+      automations: [
+        {
+          kind: 'aeration' as const,
+          enabled: blowerRunning,
+          until: aerationUntil,
+        },
+        {
+          kind: 'sprinkler' as const,
+          enabled: pumpRunning,
+          until: sprinklerUntil,
+        },
+      ],
+    };
   }
 }
