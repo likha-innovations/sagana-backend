@@ -3,7 +3,11 @@ import { createZodDto } from 'nestjs-zod';
 
 export const UpdateMachineSchema = z
   .object({
-    name: z.string().min(1, 'Name is required').max(30, 'Name must be 30 characters or fewer').optional(),
+    name: z
+      .string()
+      .min(1, 'Name is required')
+      .max(30, 'Name must be 30 characters or fewer')
+      .optional(),
     wifiSsid: z.string().min(1, 'WiFi SSID is required').optional(),
   })
   .refine(

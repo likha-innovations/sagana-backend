@@ -2,7 +2,10 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod/v4';
 
 export const RegisterMachineSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(30, 'Name must be 30 characters or fewer'),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(30, 'Name must be 30 characters or fewer'),
   macAddress: z
     .string()
     .min(1, 'Device identifier is required')
