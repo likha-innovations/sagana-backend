@@ -9,7 +9,12 @@ jest.mock('@clerk/backend', () => ({ createClerkClient: jest.fn() }));
 describe('UsersService', () => {
   let service: UsersService;
   let prismaService: {
-    user: { findMany: jest.Mock; findUnique: jest.Mock; upsert: jest.Mock };
+    user: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      upsert: jest.Mock;
+      update: jest.Mock;
+    };
     barangay: { findUnique: jest.Mock };
   };
 
@@ -19,6 +24,7 @@ describe('UsersService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        update: jest.fn(),
       },
       barangay: {
         findUnique: jest.fn(),
@@ -174,6 +180,65 @@ describe('UsersService', () => {
       const args = prismaService.user.upsert.mock.calls[0][0];
       expect(args.create.role).toBe('operator');
       expect(args.create.barangayId).toBeNull();
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('updates allowed profile fields without accepting barangayId', async () => {
+      const existingUser = {
+        id: 'user_1',
+        fullName: 'Juan Dela Cruz',
+        birthday: new Date('1990-01-01'),
+        barangayId: 'brgy_original',
+      };
+      prismaService.user.findUnique.mockResolvedValue(existingUser);
+      prismaService.user.update.mockResolvedValue({
+        ...existingUser,
+        fullName: 'Maria Dela Cruz',
+      });
+
+      await service.updateProfile('user_1', {
+        firstName: 'Maria',
+        birthday: '1995-05-05',
+      });
+
+      expect(prismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user_1' },
+        data: {
+          fullName: 'Maria Dela Cruz',
+          birthday: new Date('1995-05-05'),
+        },
+        include: {
+          barangay: {
+            select: { id: true, name: true, status: true, createdAt: true },
+          },
+        },
+      });
+      const updatePayload = prismaService.user.update.mock.calls[0][0].data;
+      expect(updatePayload).not.toHaveProperty('barangayId');
+    });
+
+    it('ignores extraneous barangayId parameter if forced into service', async () => {
+      const existingUser = {
+        id: 'user_1',
+        fullName: 'Juan Dela Cruz',
+        barangayId: 'brgy_original',
+      };
+      prismaService.user.findUnique.mockResolvedValue(existingUser);
+      prismaService.user.update.mockResolvedValue(existingUser);
+
+      await (
+        service.updateProfile as unknown as (
+          id: string,
+          data: unknown,
+        ) => Promise<unknown>
+      )('user_1', {
+        firstName: 'Juan',
+        barangayId: 'malicious_brgy',
+      });
+
+      const updatePayload = prismaService.user.update.mock.calls[0][0].data;
+      expect(updatePayload).not.toHaveProperty('barangayId');
     });
   });
 });

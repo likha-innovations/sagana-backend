@@ -247,12 +247,12 @@ describe('Admin authorization', () => {
       await request(app.getHttpServer())
         .patch('/me')
         .auth(userId, { type: 'bearer' })
-        .send({ barangayId: 'b2' })
+        .send({ firstName: 'Updated' })
         .expect(200);
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: userId },
-          data: { barangayId: 'b2' },
+          data: { fullName: 'Updated' },
         }),
       );
       await request(app.getHttpServer())
