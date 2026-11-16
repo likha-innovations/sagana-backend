@@ -112,7 +112,6 @@ export class UsersService {
       firstName?: string;
       lastName?: string;
       birthday?: string;
-      barangayId?: string;
     },
   ) {
     this.logger.log(`Updating profile for user ${userId}`, UsersService.name);
@@ -135,9 +134,6 @@ export class UsersService {
 
     if (data.birthday !== undefined) {
       updateData.birthday = data.birthday ? new Date(data.birthday) : null;
-    }
-    if (data.barangayId !== undefined) {
-      updateData.barangayId = data.barangayId;
     }
 
     return this.prisma.user.update({
