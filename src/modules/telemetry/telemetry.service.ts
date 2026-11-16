@@ -82,6 +82,7 @@ export class TelemetryService implements OnModuleInit {
           machineId: machine.id,
           macAddress,
           status: machineStatus,
+          barangayId: machine.barangayId,
         });
         return;
       }

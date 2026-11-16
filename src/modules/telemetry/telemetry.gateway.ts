@@ -10,7 +10,9 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { verifyToken } from '@clerk/backend';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 
 @WebSocketGateway({
   cors: {
@@ -26,7 +28,10 @@ export class TelemetryGateway
 
   private readonly logger = new Logger(TelemetryGateway.name);
 
-  constructor(private readonly mqttService: MqttService) {}
+  constructor(
+    private readonly mqttService: MqttService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   afterInit() {
     this.logger.log(
@@ -34,10 +39,53 @@ export class TelemetryGateway
     );
   }
 
-  handleConnection(client: Socket) {
-    this.logger.log(
-      `Client connected: ${client.id} (Total: ${this.getClientCount()})`,
-    );
+  async handleConnection(client: Socket) {
+    try {
+      const authHeader =
+        (client.handshake.auth?.token as string) ||
+        (client.handshake.headers.authorization as string) ||
+        '';
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+
+      if (!token) {
+        this.logger.warn(
+          `Rejecting unauthenticated socket connection: ${client.id}`,
+        );
+        client.disconnect(true);
+        return;
+      }
+
+      const payload = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!user?.barangayId) {
+        this.logger.warn(
+          `Socket ${client.id} authenticated for user ${payload.sub} but has no barangay assigned. Disconnecting.`,
+        );
+        client.disconnect(true);
+        return;
+      }
+
+      // Join the isolated barangay room
+      const room = `barangay:${user.barangayId}`;
+      await client.join(room);
+      client.data.userId = user.id;
+      client.data.barangayId = user.barangayId;
+
+      this.logger.log(
+        `Client connected: ${client.id} (User: ${user.id}, Room: ${room}, Total: ${this.getClientCount()})`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Socket authentication failed for client ${client.id}: ${err instanceof Error ? err.message : err}`,
+      );
+      client.disconnect(true);
+    }
   }
 
   handleDisconnect(client: Socket) {
@@ -50,16 +98,32 @@ export class TelemetryGateway
     return this.server?.sockets?.sockets?.size || 0;
   }
 
-  // Emits device online/offline status changes to all mobile clients
+  // Helper to emit to a specific barangay room or fallback to broadcast if barangayId is missing
+  private emitToBarangay(
+    barangayId: string | undefined,
+    event: string,
+    data: unknown,
+  ) {
+    if (!this.server) return;
+    if (barangayId) {
+      this.server.to(`barangay:${barangayId}`).emit(event, data);
+    } else {
+      this.server.emit(event, data);
+    }
+  }
+
+  // Emits device online/offline status changes to barangay room
   broadcastStatus(data: {
     machineId: string;
     macAddress: string;
     status: string;
+    barangayId?: string;
   }) {
     if (!this.server) return;
-    this.server.emit('status', data);
+    this.emitToBarangay(data.barangayId, 'status', data);
     this.logger.log(
-      "📤 [Socket.IO Emitted] Event 'status': " + JSON.stringify(data),
+      `📤 [Socket.IO Emitted] Event 'status' to room [${data.barangayId ? `barangay:${data.barangayId}` : 'all'}]: ` +
+        JSON.stringify(data),
     );
   }
 
@@ -74,55 +138,72 @@ export class TelemetryGateway
     createdAt: string;
   }) {
     if (!this.server) return;
-    this.server.emit('machine_added', data);
+    this.emitToBarangay(data.barangayId, 'machine_added', data);
     this.logger.log(
-      "📤 [Socket.IO Emitted] Event 'machine_added': " + JSON.stringify(data),
+      `📤 [Socket.IO Emitted] Event 'machine_added' to room [barangay:${data.barangayId}]: ` +
+        JSON.stringify(data),
     );
   }
 
-  // Emits machine metadata updates to all mobile clients
+  // Emits machine metadata updates to all mobile clients in the same barangay
   broadcastMachineUpdated(data: {
     machineId: string;
     name?: string;
     barangayId?: string;
   }) {
     if (!this.server) return;
-    this.server.emit('machine_updated', data);
+    this.emitToBarangay(data.barangayId, 'machine_updated', data);
     this.logger.log(
-      "📤 [Socket.IO Emitted] Event 'machine_updated': " + JSON.stringify(data),
+      `📤 [Socket.IO Emitted] Event 'machine_updated' to room [${data.barangayId ? `barangay:${data.barangayId}` : 'all'}]: ` +
+        JSON.stringify(data),
     );
   }
 
-  // Emits machine removal to all mobile clients
+  // Emits machine removal to all mobile clients in the same barangay
   broadcastMachineRemoved(data: { machineId: string; barangayId?: string }) {
     if (!this.server) return;
-    this.server.emit('machine_removed', data);
+    this.emitToBarangay(data.barangayId, 'machine_removed', data);
     this.logger.log(
-      "📤 [Socket.IO Emitted] Event 'machine_removed': " + JSON.stringify(data),
+      `📤 [Socket.IO Emitted] Event 'machine_removed' to room [${data.barangayId ? `barangay:${data.barangayId}` : 'all'}]: ` +
+        JSON.stringify(data),
     );
   }
 
-  // Emits real-time telemetry stream received from EMQX to all mobile clients
+  // Emits real-time telemetry stream received from EMQX to target barangay room
   broadcastTelemetry(data: unknown) {
     if (!this.server) return;
+    const barangayId =
+      typeof data === 'object' && data !== null && 'barangayId' in data
+        ? (data as { barangayId?: string }).barangayId
+        : undefined;
+
+    this.emitToBarangay(barangayId, 'telemetry', data);
+
     const payloadStr =
       typeof data === 'object' && data !== null
         ? JSON.stringify(data)
         : String(data);
-    this.server.emit('telemetry', data);
-    this.logger.log(`📤 [Socket.IO Emitted] Event 'telemetry': ${payloadStr}`);
+    this.logger.log(
+      `📤 [Socket.IO Emitted] Event 'telemetry' to room [${barangayId ? `barangay:${barangayId}` : 'all'}]: ${payloadStr}`,
+    );
   }
 
-  // Emits discrete automation log event (blower, sprinkler, e-stop) to all mobile clients
+  // Emits discrete automation log event (blower, sprinkler, e-stop) to target barangay room
   broadcastAutomationLog(data: unknown) {
     if (!this.server) return;
+    const barangayId =
+      typeof data === 'object' && data !== null && 'barangayId' in data
+        ? (data as { barangayId?: string }).barangayId
+        : undefined;
+
+    this.emitToBarangay(barangayId, 'automation_log', data);
+
     const payloadStr =
       typeof data === 'object' && data !== null
         ? JSON.stringify(data)
         : String(data);
-    this.server.emit('automation_log', data);
     this.logger.log(
-      `📤 [Socket.IO Emitted] Event 'automation_log': ${payloadStr}`,
+      `📤 [Socket.IO Emitted] Event 'automation_log' to room [${barangayId ? `barangay:${barangayId}` : 'all'}]: ${payloadStr}`,
     );
   }
 
