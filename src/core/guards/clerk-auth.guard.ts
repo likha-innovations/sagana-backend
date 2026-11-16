@@ -2,16 +2,24 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { verifyToken } from '@clerk/backend';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { UsersService } from '../../modules/users/users.service';
+import type { RequestUser } from '../types/auth.types';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
+    @Optional() private readonly usersService?: UsersService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -30,15 +38,50 @@ export class ClerkAuthGuard implements CanActivate {
       throw new UnauthorizedException('Authentication token missing');
     }
 
+    let payload: { sub: string };
     try {
-      const payload = await verifyToken(token, {
+      payload = await verifyToken(token, {
         secretKey: process.env.CLERK_SECRET_KEY,
       });
-      request['user'] = { id: payload.sub };
-      return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+
+    if (!payload?.sub) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    const userId = payload.sub;
+    let user: RequestUser | null = null;
+
+    if (this.prisma?.user?.findUnique) {
+      user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true, barangayId: true, status: true },
+      });
+    }
+
+    if (!user && this.usersService) {
+      try {
+        const profile = await this.usersService.getProfile(userId);
+        user = {
+          id: profile.id,
+          role: profile.role,
+          barangayId: profile.barangayId,
+          status: profile.status,
+        };
+      } catch {
+        user = null;
+      }
+    }
+
+    request.user = {
+      id: user?.id ?? userId,
+      role: user?.role ?? 'operator',
+      barangayId: user?.barangayId ?? null,
+      status: user?.status ?? (user ? 'active' : 'unindexed'),
+    };
+    return true;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
