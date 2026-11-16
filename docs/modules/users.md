@@ -20,7 +20,7 @@ The **Users Module** manages user identity data within the local PostgreSQL data
   ```http
   Authorization: Bearer <clerk_session_jwt>
   ```
-* **Request Context**: Once verified, the decoded Clerk user ID (`sub`) is automatically attached to `request.user.id` for downstream services.
+* **Request Context**: Once verified, `ClerkAuthGuard` automatically hydrates the full request context (`request.user`) with `{ id, role, barangayId, status }` for downstream guards (`AdminGuard`) and services.
 * **Unauthorized Access**: Requests with missing, expired, or malformed tokens will immediately receive a `401 Unauthorized` response.
 * **Public Endpoints**: Only endpoints explicitly decorated with `@Public()` (such as public health checks) bypass authentication.
 :::

@@ -27,8 +27,11 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
   - `src/modules/`: Feature modules (`users`, `machines`, `telemetry`).
 - **Authentication & Security**:
   - Global `ClerkAuthGuard` enforced via `APP_GUARD`.
+  - Performs 1 indexed DB lookup on token verification, hydrating `request.user` with `{ id, role, barangayId, status }` (`RequestUser`) and JIT fallback for unindexed users.
+  - In-memory `AdminGuard` validates `request.user.role === 'admin'` synchronously with 0 DB queries.
   - Use `@Public()` decorator to bypass auth (e.g., health checks).
-  - Use `@CurrentUserId()` decorator to extract Clerk user ID from authenticated requests.
+  - Use `@CurrentUser()` decorator to inject full `RequestUser` or a specific field (`@CurrentUser('barangayId')`).
+  - Use `@CurrentUserId()` decorator to extract Clerk user ID string (`request.user.id`).
   - Global rate limiting: `ThrottlerModule` (100 req / 60s window).
 - **Validation & DTOs**:
   - Feature-colocated DTOs in `src/modules/<feature>/dto/`.

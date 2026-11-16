@@ -12,8 +12,11 @@ Every incoming HTTP request travels through a unified pipeline of guards, interc
 flowchart TD
     Client["📱 Client App (Mobile / Web)"] --> Middleware["1. CORS Middleware"]
     Middleware --> Throttler["2. ThrottlerGuard (Rate Limit: 100 req/min)"]
-    Throttler --> Auth["3. ClerkAuthGuard (JWT Verification)"]
-    Auth --> Validation["4. ZodValidationPipe (DTO Parsing)"]
+    Throttler --> Auth["3. ClerkAuthGuard (JWT Verification & Context Hydration)"]
+    Auth --> AdminCheck{"Has @AdminOnly()?"}
+    AdminCheck -->|YES| AdminGuard["4a. AdminGuard (In-Memory Role Check)"]
+    AdminCheck -->|NO| Validation["4b. ZodValidationPipe (DTO Parsing)"]
+    AdminGuard --> Validation
     Validation --> Handler["5. Controller & Domain Service Execution"]
     
     Handler --> Result{Execution Result}

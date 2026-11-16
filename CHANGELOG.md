@@ -8,8 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Request context hydration in `ClerkAuthGuard`: populates `request.user` with `RequestUser` (`id`, `role`, `barangayId`, `status`) at the authentication boundary (#59).
+- `@CurrentUser()` parameter decorator in `src/core/decorators/current-user.decorator.ts` supporting full user injection or single-field extraction.
+- Global typing augmentation in `src/core/types/auth.types.ts` for Express `Request.user`.
 - Compost batch creation and sensor reading endpoints for active composting cycles.
 - Database seed script enhancements supporting configurable connection environments.
+
+### Changed
+- `AdminGuard` refactored to perform synchronous in-memory role verification against `request.user.role`, eliminating redundant database lookups on admin endpoints (#59).
+- Exported `UsersService` from `UsersModule` to support JIT synchronization in auth guard.
 
 ---
 
