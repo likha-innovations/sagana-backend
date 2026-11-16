@@ -40,15 +40,16 @@ Shared infrastructure utilities that do not belong to any specific business doma
 * **`config/env.validation.ts`**: Zod schema validating critical environment variables (`DATABASE_URL`, `CLERK_SECRET_KEY`, `PORT`) at server boot.
 * **`decorators/`**:
   * `public.decorator.ts`: `@Public()` metadata decorator to whitelist endpoints from the global auth guard.
-  * `current-user.decorator.ts`: `@CurrentUserId()` param decorator extracting `req.user.id`.
+  * `current-user.decorator.ts`: `@CurrentUser()` and `@CurrentUserId()` param decorators injecting hydrated user context (`RequestUser`) or specific user ID string.
   * `admin-only.decorator.ts`: `@AdminOnly()` metadata and guard binding for admin-restricted endpoints.
 * **`exceptions/global-exception.filter.ts`**: Catches all unhandled exceptions, maps Prisma error codes (like unique constraint conflicts), and returns standardized JSON errors.
 * **`guards/`**:
-  * `clerk-auth.guard.ts`: Global JWT verification guard using `@clerk/backend`.
-  * `admin.guard.ts`: Role-based access guard verifying admin role and barangay assignment.
+  * `clerk-auth.guard.ts`: Global JWT verification guard using `@clerk/backend` with automatic single-query user context hydration.
+  * `admin.guard.ts`: Fast in-memory role-based guard verifying admin role without database overhead.
 * **`interceptors/transform-response.interceptor.ts`**: Standardizes all successful responses into `{ success: true, data: T, timestamp }`.
 * **`logger/logger.service.ts`**: Custom console and asynchronous file logging with `Asia/Manila` timezones.
 * **`swagger/examples.ts`**: Standardized Swagger schemas, DTOs, and error response examples.
+* **`types/auth.types.ts`**: `RequestUser` interface (`id`, `role`, `barangayId`, `status`) and Express `Request` type augmentation.
 
 ---
 

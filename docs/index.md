@@ -19,7 +19,7 @@ hero:
 features:
   - icon: 🛡️
     title: Clerk-Driven Authentication
-    details: Complete JWT verification lifecycle, global route protection, and easy @Public / @CurrentUserId decorators.
+    details: Complete JWT verification, request context hydration, global route protection, and @Public / @CurrentUser decorators.
   - icon: 💎
     title: Type Safety & Validation
     details: Unified Zod v4 schemas for request payloads, environment variables, and Prisma client generation.
