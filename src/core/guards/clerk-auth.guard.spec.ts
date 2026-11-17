@@ -39,6 +39,7 @@ describe('ClerkAuthGuard', () => {
     prisma = {
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
     usersService = {
@@ -144,5 +145,58 @@ describe('ClerkAuthGuard', () => {
       barangayId: null,
       status: 'unindexed',
     });
+  });
+
+  it('allows dev token bypass in development when ENABLE_DEV_AUTH_BYPASS is true', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalBypass = process.env.ENABLE_DEV_AUTH_BYPASS;
+    process.env.NODE_ENV = 'development';
+    process.env.ENABLE_DEV_AUTH_BYPASS = 'true';
+
+    try {
+      const context = createMockContext({
+        authorization: 'Bearer dev_operator',
+      });
+      const req = context.switchToHttp().getRequest();
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'user_dev_1',
+        role: 'operator',
+        barangayId: 'brgy_dev_1',
+        status: 'active',
+      });
+
+      const result = await guard.canActivate(context);
+
+      expect(result).toBe(true);
+      expect(verifyToken).not.toHaveBeenCalled();
+      expect(req.user).toEqual({
+        id: 'user_dev_1',
+        role: 'operator',
+        barangayId: 'brgy_dev_1',
+        status: 'active',
+      });
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      process.env.ENABLE_DEV_AUTH_BYPASS = originalBypass;
+    }
+  });
+
+  it('rejects dev token when ENABLE_DEV_AUTH_BYPASS is not enabled', async () => {
+    const originalBypass = process.env.ENABLE_DEV_AUTH_BYPASS;
+    delete process.env.ENABLE_DEV_AUTH_BYPASS;
+
+    try {
+      const context = createMockContext({
+        authorization: 'Bearer dev_operator',
+      });
+      jest.mocked(verifyToken).mockRejectedValue(new Error('Invalid token'));
+
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(verifyToken).toHaveBeenCalled();
+    } finally {
+      process.env.ENABLE_DEV_AUTH_BYPASS = originalBypass;
+    }
   });
 });
