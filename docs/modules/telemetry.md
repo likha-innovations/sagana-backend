@@ -54,7 +54,8 @@ flowchart TD
 | Topic Pattern | Direction | QoS | Purpose |
 | :--- | :--- | :---: | :--- |
 | **`sagana/devices/:macAddress/telemetry`** | Firmware → Broker → Backend | `1` | Live telemetry readings (temperature, humidity, moisture, pH, methane). Stored in `telemetry_logs` and broadcast to clients. |
-| **`sagana/devices/:macAddress/status`** | Firmware → Broker → Backend | `1` | Device online / offline status (including MQTT Last Will and Testament `LWT`). Updates `machine.status` and `lastSeen`. |
+| **`sagana/devices/:macAddress/status`** | Firmware → Broker → Backend | `1` | Device online / offline status (including MQTT Last Will and Testament `LWT`). Updates `machine.status` and `lastSeen`. Triggers offline alert notifications. |
+| **`sagana/devices/:macAddress/events`** | Firmware → Broker → Backend | `1` | Critical hardware alert events (e.g., emergency stop, overtemp, motor failure). Stored in `automation_logs` and dispatches immediate high-priority notifications. |
 | **`sagana/devices/:macAddress/commands`** | Backend → Broker → Firmware | `1` | Downlink control messages (e.g. `{"action": "SET_NAME", "name": "..."}`, relay controls). |
 
 ::: tip 🔄 Automatic Device Name Synchronization
@@ -91,6 +92,7 @@ The backend exposes a real-time **Socket.IO Gateway** mounted on namespace **`/t
 | :--- | :--- | :--- |
 | **`telemetry`** | `{ machineId, macAddress, name, barangayId, timestamp, ...readings }` | Enriched sensor readings from MQTT stream. |
 | **`status`** | `{ machineId, macAddress, status }` | Device connectivity transition (`active` vs `offline`). |
+| **`notification`** | `{ id, title, message, type, isRead, createdAt, metadata }` | Real-time alert dispatched to targeted barangay rooms or specific user sockets. |
 | **`machine_added`** | `{ machineId, name, macAddress, barangayId, wifiSsid, status, createdAt }` | Broadcast when a new machine is registered or re-provisioned. |
 | **`machine_updated`** | `{ machineId, name, barangayId }` | Broadcast when a machine is renamed or modified. |
 | **`machine_removed`** | `{ machineId, barangayId }` | Broadcast when a machine is soft-deleted. |
@@ -99,7 +101,24 @@ The backend exposes a real-time **Socket.IO Gateway** mounted on namespace **`/t
 
 | Event Name | Request Payload | Action |
 | :--- | :--- | :--- |
+| **`join_barangay`** | `{ barangayId?: string }` | Joins the authenticated client's socket to room `barangay_<barangayId>`. Rejects unauthenticated joins or joins where the requested barangay does not match the token identity. |
 | **`command`** | `string \| object` | Forwards actuator/control payload directly to the device's MQTT command topic. |
+
+---
+
+## 🚨 Automated Alert Triggers
+
+The telemetry ingest engine continuously monitors machine streams and automatically writes persistent alerts to `notifications` and Socket.IO:
+
+1. **Device Offline Transition**:
+   - **Source**: `sagana/devices/:macAddress/status` (`status: "offline"`)
+   - **Action**: Generates a `WARNING` notification (`Machine Offline`) for all operators in the machine's assigned barangay.
+2. **Emergency Stop & Hardware Events**:
+   - **Source**: `sagana/devices/:macAddress/events`
+   - **Action**: Persists raw event to `automation_logs`, spreads event metadata with authoritative `macAddress` and `logId` pinning, and writes a `CRITICAL` notification (`Hardware Alert: <eventType>`).
+3. **Threshold Violations (Overtemperature)**:
+   - **Source**: `sagana/devices/:macAddress/telemetry` (`temperature > 75°C`)
+   - **Action**: Generates a `CRITICAL` alert (`High Temperature Warning`) with current reading and timestamp metadata to prevent compost overheat or hardware damage.
 
 ---
 

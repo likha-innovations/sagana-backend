@@ -60,6 +60,7 @@ export default withMermaid(
             { text: 'Batches & Sensor History', link: '/modules/batches' },
             { text: 'Feedstocks Module', link: '/modules/feedstocks' },
             { text: 'Barangays Module', link: '/modules/barangays' },
+            { text: 'In-App Notifications', link: '/modules/notifications' },
             {
               text: 'Telemetry & IoT (HiveMQ MQTT)',
               link: '/modules/telemetry',

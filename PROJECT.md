@@ -24,7 +24,7 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
   - `src/infrastructure/`:
     - Database module & Prisma client service (`PrismaService` with `@prisma/adapter-pg`).
     - MQTT module (`MqttService` managing broker connection, topic subscriptions, and publishing commands).
-  - `src/modules/`: Feature modules (`users`, `machines`, `telemetry`).
+  - `src/modules/`: Feature modules (`users`, `machines`, `telemetry`, `notifications`).
 - **Authentication & Security**:
   - Global `ClerkAuthGuard` enforced via `APP_GUARD`.
   - Performs 1 indexed DB lookup on token verification, hydrating `request.user` with `{ id, role, barangayId, status }` (`RequestUser`) and JIT fallback for unindexed users.
@@ -60,8 +60,17 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
 - **Telemetry & IoT (`/telemetry`)**:
   - `POST /telemetry/devices/:deviceId/command` — Dispatches MQTT control command to `sagana/devices/:deviceId/commands`.
   - **Socket.IO `/telemetry` Namespace & MQTT Bridge**:
-    - **Inbound Telemetry**: Subscribes to HiveMQ Cloud topic `sagana/stream` and broadcasts live sensor readings to mobile clients via event `'telemetry'`.
-    - **Outbound Commands**: Listens to Socket.IO event `'command'` from clients and dispatches it directly to HiveMQ Cloud topic `sagana/commands`.
+    - **Inbound Telemetry**: Subscribes to HiveMQ Cloud topic `sagana/devices/+/telemetry` and broadcasts live sensor readings to mobile clients via event `'telemetry'`.
+    - **Status & Alerts**: Subscribes to `sagana/devices/+/status` (LWT/online/offline) and `sagana/devices/+/events` (hardware alerts/e-stop).
+    - **Outbound Commands**: Listens to Socket.IO event `'command'` from clients and dispatches it directly to HiveMQ Cloud topic `sagana/devices/:mac/commands`.
+    - **Room Scoping**: Inbound event `'join_barangay'` requires authenticated user identity and joins `barangay_<barangayId>` room.
+    - **Automated Alert Triggers**: Dispatches real-time event `'notification'` on machine offline status, emergency stop/alarms, and temperature > 75°C.
+- **In-App Notifications (`/notifications`)**:
+  - `GET /notifications` — List paginated notifications scoped to user and user's barangay (`cursor`, `limit`, `unreadOnly`).
+  - `GET /notifications/unread-count` — Count of unread notifications for current user.
+  - `PATCH /notifications/:id/read` — Mark single notification as read.
+  - `PATCH /notifications/read-all` — Mark all accessible notifications as read.
+  - `POST /notifications` — Create manual or programmatic notification (system/admin).
 
 ## Decisions & Dead-ends
 
