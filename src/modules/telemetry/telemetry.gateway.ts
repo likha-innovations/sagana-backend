@@ -254,22 +254,22 @@ export class TelemetryGateway
   // Handles explicit room join from mobile client for barangay isolation
   @SubscribeMessage('join_barangay')
   async handleJoinBarangay(
-    @MessageBody() data: { barangayId?: string } | string,
+    @MessageBody() _data: unknown,
     @ConnectedSocket() client: Socket,
   ) {
-    const requestedBarangayId =
-      typeof data === 'string' ? data : data?.barangayId;
-    const targetBarangayId =
-      (client.data?.barangayId as string | undefined) || requestedBarangayId;
+    const barangayId = client.data?.barangayId as string | undefined;
 
-    if (targetBarangayId) {
-      await client.join(`barangay:${targetBarangayId}`);
+    if (barangayId) {
+      await client.join(`barangay:${barangayId}`);
       this.logger.log(
-        `Client ${client.id} joined room: barangay:${targetBarangayId}`,
+        `Client ${client.id} joined room: barangay:${barangayId}`,
       );
-      return { status: 'joined', room: `barangay:${targetBarangayId}` };
+      return { status: 'joined', room: `barangay:${barangayId}` };
     }
-    return { status: 'ignored' };
+    return {
+      status: 'rejected',
+      reason: 'Unauthenticated or no assigned barangay',
+    };
   }
 
   // Receives custom command from mobile client and dispatches it to the target device's MQTT topic

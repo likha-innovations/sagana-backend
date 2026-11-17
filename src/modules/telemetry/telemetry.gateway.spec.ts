@@ -130,6 +130,25 @@ describe('TelemetryGateway', () => {
     expect(result).toEqual({ status: 'joined', room: 'barangay:brgy-123' });
   });
 
+  it('should reject handleJoinBarangay when client has no authenticated barangayId', async () => {
+    const mockSocket = {
+      id: 'unauth-socket',
+      data: {},
+      join: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const result = await gateway.handleJoinBarangay(
+      { barangayId: 'brgy-spoofed' },
+      mockSocket,
+    );
+
+    expect(mockSocket.join).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'rejected',
+      reason: 'Unauthenticated or no assigned barangay',
+    });
+  });
+
   it('should authenticate client with dev token in development when ENABLE_DEV_AUTH_BYPASS is true', async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalBypass = process.env.ENABLE_DEV_AUTH_BYPASS;

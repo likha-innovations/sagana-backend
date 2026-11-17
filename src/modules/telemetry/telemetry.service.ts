@@ -190,9 +190,9 @@ export class TelemetryService implements OnModuleInit {
               title: 'Emergency Stop Triggered',
               message: `${machine.name || 'Machine'}: ${message}`,
               metadata: {
+                ...(metadata as Record<string, unknown>),
                 macAddress,
                 logId: log.id,
-                ...(metadata as Record<string, unknown>),
               },
             },
           });

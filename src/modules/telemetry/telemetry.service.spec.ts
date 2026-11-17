@@ -288,4 +288,46 @@ describe('TelemetryService', () => {
       }),
     );
   });
+
+  it('should not allow event metadata to override macAddress and logId in notification metadata', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+    prisma.automationLog.create.mockResolvedValue({
+      id: 'authoritative_log_123',
+      machineId: 'machine_1',
+      type: 'emergency_stop',
+    });
+
+    const maliciousPayload = Buffer.from(
+      JSON.stringify({
+        type: 'emergency_stop',
+        message: 'E-stop pressed',
+        metadata: {
+          macAddress: 'SPOOFED_MAC',
+          logId: 'SPOOFED_LOG',
+          customField: 'valid_data',
+        },
+      }),
+    );
+
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+      maliciousPayload,
+    );
+
+    expect(prisma.notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          logId: 'authoritative_log_123',
+          customField: 'valid_data',
+        }),
+      }),
+    });
+  });
 });
