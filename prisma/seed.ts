@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { seedBarangays } from './seed-barangays';
 
 const connectionString = `${process.env.DATABASE_URL}`;
 const pool = new Pool({ connectionString });
@@ -206,8 +207,12 @@ async function main() {
     console.warn('Could not run raw whitespace cleanup:', err);
   }
 
-  // 2. Fetch default operator user
-  console.log('2. Resolving target operator user...');
+  // 2. Seed Barangays and codes
+  console.log('2. Seeding Barangays 170-180 and codes...');
+  await seedBarangays(prisma);
+
+  // 3. Fetch default operator user
+  console.log('3. Resolving target operator user...');
   const existingUser = await prisma.user.findFirst();
   if (!existingUser) {
     console.warn(
@@ -216,12 +221,18 @@ async function main() {
     return;
   }
   const operatorBarangayId = existingUser.barangayId || 'brgy_176';
+  if (!existingUser.barangayId) {
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: { barangayId: operatorBarangayId },
+    });
+  }
   console.log(
     `Using operator: ${existingUser.fullName || existingUser.id} (${operatorBarangayId})`,
   );
 
-  // 3. Seed Feedstocks Catalog
-  console.log('3. Seeding Feedstocks Catalog...');
+  // 4. Seed Feedstocks Catalog
+  console.log('4. Seeding Feedstocks Catalog...');
   const feedstocksData = [
     {
       id: 'feedstock_veg_scraps',

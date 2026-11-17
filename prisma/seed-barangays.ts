@@ -26,3 +26,21 @@ export async function seedBarangayCodes(prisma: PrismaClient) {
     }
   }
 }
+
+export async function seedBarangays(prisma: PrismaClient) {
+  const barangays = Array.from({ length: 11 }, (_, i) => ({
+    id: `brgy_${170 + i}`,
+    name: `Barangay ${170 + i}`,
+  }));
+
+  for (const brgy of barangays) {
+    await prisma.barangay.upsert({
+      where: { id: brgy.id },
+      update: { name: brgy.name },
+      create: { id: brgy.id, name: brgy.name },
+    });
+  }
+
+  await seedBarangayCodes(prisma);
+}
+
