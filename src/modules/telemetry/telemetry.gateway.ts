@@ -55,6 +55,37 @@ export class TelemetryGateway
         return;
       }
 
+      // Allow dev tokens in development mode with explicit opt-in flag for easy socket testing
+      const isDevAuthAllowed =
+        process.env.NODE_ENV === 'development' &&
+        process.env.ENABLE_DEV_AUTH_BYPASS === 'true';
+
+      if (isDevAuthAllowed && token.startsWith('dev_')) {
+        const devIdentifier = token.replace(/^dev_/, '');
+        let devUser = await this.prisma.user.findFirst({
+          where:
+            devIdentifier === 'operator' || devIdentifier === 'admin'
+              ? { role: devIdentifier }
+              : { OR: [{ id: devIdentifier }, { email: devIdentifier }] },
+          select: { id: true, barangayId: true },
+        });
+        if (!devUser) {
+          devUser = await this.prisma.user.findFirst({
+            select: { id: true, barangayId: true },
+          });
+        }
+        if (devUser?.barangayId) {
+          const room = `barangay:${devUser.barangayId}`;
+          await client.join(room);
+          client.data.userId = devUser.id;
+          client.data.barangayId = devUser.barangayId;
+          this.logger.log(
+            `Client connected with dev token: ${client.id} (User: ${devUser.id}, Room: ${room}, Total: ${this.getClientCount()})`,
+          );
+          return;
+        }
+      }
+
       const payload = await verifyToken(token, {
         secretKey: process.env.CLERK_SECRET_KEY,
       });
@@ -205,6 +236,40 @@ export class TelemetryGateway
     this.logger.log(
       `📤 [Socket.IO Emitted] Event 'automation_log' to room [${barangayId ? `barangay:${barangayId}` : 'all'}]: ${payloadStr}`,
     );
+  }
+
+  // Emits in-app alert notification to target barangay room
+  broadcastNotification(barangayId: string, data: unknown) {
+    if (!this.server) return;
+    this.emitToBarangay(barangayId, 'notification', data);
+    const payloadStr =
+      typeof data === 'object' && data !== null
+        ? JSON.stringify(data)
+        : String(data);
+    this.logger.log(
+      `📤 [Socket.IO Emitted] Event 'notification' to room [${barangayId ? `barangay:${barangayId}` : 'all'}]: ${payloadStr}`,
+    );
+  }
+
+  // Handles explicit room join from mobile client for barangay isolation
+  @SubscribeMessage('join_barangay')
+  async handleJoinBarangay(
+    @MessageBody() data: { barangayId?: string } | string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const requestedBarangayId =
+      typeof data === 'string' ? data : data?.barangayId;
+    const targetBarangayId =
+      (client.data?.barangayId as string | undefined) || requestedBarangayId;
+
+    if (targetBarangayId) {
+      await client.join(`barangay:${targetBarangayId}`);
+      this.logger.log(
+        `Client ${client.id} joined room: barangay:${targetBarangayId}`,
+      );
+      return { status: 'joined', room: `barangay:${targetBarangayId}` };
+    }
+    return { status: 'ignored' };
   }
 
   // Receives custom command from mobile client and dispatches it to the target device's MQTT topic
