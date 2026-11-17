@@ -84,6 +84,36 @@ export class TelemetryService implements OnModuleInit {
           status: machineStatus,
           barangayId: machine.barangayId,
         });
+
+        // Generate and broadcast alert if machine transitions to offline
+        if (!isOnline && machine.barangayId) {
+          const notif = await this.prisma.notification.create({
+            data: {
+              barangayId: machine.barangayId,
+              machineId: machine.id,
+              type: 'machine',
+              severity: 'warning',
+              title: `${machine.name || 'Machine'} Offline`,
+              message: `${machine.name || 'Machine'} (${macAddress}) has disconnected or gone offline.`,
+              metadata: { macAddress, status: machineStatus },
+            },
+          });
+          this.telemetryGateway.broadcastNotification(machine.barangayId, {
+            id: notif.id,
+            barangayId: notif.barangayId,
+            machineId: notif.machineId,
+            batchId: notif.batchId,
+            userId: notif.userId,
+            type: notif.type,
+            severity: notif.severity,
+            title: notif.title,
+            message: notif.message,
+            metadata: notif.metadata,
+            isRead: notif.isRead,
+            readAt: notif.readAt ? notif.readAt.toISOString() : null,
+            createdAt: notif.createdAt.toISOString(),
+          });
+        }
         return;
       }
 
@@ -145,6 +175,43 @@ export class TelemetryService implements OnModuleInit {
           macAddress,
           barangayId: machine.barangayId,
         });
+
+        // Trigger critical notification on emergency stop / alarm
+        const isCritical =
+          type === 'emergency_stop' || type === 'e_stop' || type === 'alarm';
+        if (isCritical && machine.barangayId) {
+          const notif = await this.prisma.notification.create({
+            data: {
+              barangayId: machine.barangayId,
+              machineId: machine.id,
+              batchId: activeBatch?.id ?? null,
+              type: 'automation',
+              severity: 'critical',
+              title: 'Emergency Stop Triggered',
+              message: `${machine.name || 'Machine'}: ${message}`,
+              metadata: {
+                ...(metadata as Record<string, unknown>),
+                macAddress,
+                logId: log.id,
+              },
+            },
+          });
+          this.telemetryGateway.broadcastNotification(machine.barangayId, {
+            id: notif.id,
+            barangayId: notif.barangayId,
+            machineId: notif.machineId,
+            batchId: notif.batchId,
+            userId: notif.userId,
+            type: notif.type,
+            severity: notif.severity,
+            title: notif.title,
+            message: notif.message,
+            metadata: notif.metadata,
+            isRead: notif.isRead,
+            readAt: notif.readAt ? notif.readAt.toISOString() : null,
+            createdAt: notif.createdAt.toISOString(),
+          });
+        }
         return;
       }
 
@@ -204,6 +271,40 @@ export class TelemetryService implements OnModuleInit {
       );
 
       this.telemetryGateway.broadcastTelemetry(enrichedPayload);
+
+      // Trigger critical sensor notification if temperature exceeds safety threshold (75°C)
+      const temp =
+        typeof parsedData.temperature === 'number'
+          ? parsedData.temperature
+          : null;
+      if (temp !== null && temp > 75 && machine.barangayId) {
+        const notif = await this.prisma.notification.create({
+          data: {
+            barangayId: machine.barangayId,
+            machineId: machine.id,
+            type: 'sensor',
+            severity: 'critical',
+            title: 'High Temperature Alert',
+            message: `${machine.name || 'Machine'} recorded core temperature of ${temp}°C exceeding threshold.`,
+            metadata: { temperature: temp, macAddress },
+          },
+        });
+        this.telemetryGateway.broadcastNotification(machine.barangayId, {
+          id: notif.id,
+          barangayId: notif.barangayId,
+          machineId: notif.machineId,
+          batchId: notif.batchId,
+          userId: notif.userId,
+          type: notif.type,
+          severity: notif.severity,
+          title: notif.title,
+          message: notif.message,
+          metadata: notif.metadata,
+          isRead: notif.isRead,
+          readAt: notif.readAt ? notif.readAt.toISOString() : null,
+          createdAt: notif.createdAt.toISOString(),
+        });
+      }
     } catch (err) {
       this.logger.error(
         `Failed to process MQTT message from topic ${topic}: ${err instanceof Error ? err.message : err}`,

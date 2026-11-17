@@ -44,6 +44,10 @@ erDiagram
     compost_batches ||--o{ composting_phases : "progresses through"
     compost_batches ||--o{ sensor_readings : "captures"
     sensors ||--o{ sensor_readings : "measures"
+    barangays ||--o{ notifications : "targets"
+    users ||--o{ notifications : "receives"
+    machines ||--o{ notifications : "triggers"
+    compost_batches ||--o{ notifications : "references"
 
     barangays {
         string id PK "cuid"
@@ -135,6 +139,22 @@ erDiagram
         string batchId FK
         float value
         datetime recordedAt "Recorded timestamp"
+    }
+
+    notifications {
+        string id PK "cuid"
+        string barangayId FK
+        string userId FK "Nullable (null = barangay-wide broadcast)"
+        string machineId FK "Nullable"
+        string batchId FK "Nullable"
+        string title "Alert headline"
+        string message "Descriptive notification body"
+        string type "INFO | SUCCESS | WARNING | CRITICAL"
+        boolean isRead "Read status flag"
+        datetime readAt "Timestamp of acknowledgement"
+        json metadata "Arbitrary structured payload"
+        datetime createdAt
+        datetime updatedAt
     }
 ```
 

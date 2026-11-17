@@ -5,6 +5,13 @@ const envSchema = z.object({
   CLERK_SECRET_KEY: z.string().startsWith('sk_'),
   CLERK_PUBLISHABLE_KEY: z.string().startsWith('pk_'),
   PORT: z.coerce.number().default(3000),
+  NODE_ENV: z
+    .enum(['development', 'test', 'staging', 'production'])
+    .default('development'),
+  ENABLE_DEV_AUTH_BYPASS: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .transform((val) => val === true || val === 'true')
+    .default(false),
 
   // MQTT Broker (HiveMQ)
   MQTT_HOST: z.string().default('localhost'),

@@ -1,0 +1,27 @@
+meta {
+  name: Create Notification
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/notifications
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "type": "machine",
+    "severity": "critical",
+    "title": "Machine Overheat Warning",
+    "message": "Sagana Machine 1 core temperature exceeded 75°C.",
+    "metadata": {
+      "temperature": 78.5
+    }
+  }
+}

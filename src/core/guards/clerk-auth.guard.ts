@@ -38,6 +38,38 @@ export class ClerkAuthGuard implements CanActivate {
       throw new UnauthorizedException('Authentication token missing');
     }
 
+    // ponytail: in development with explicit opt-in flag, allow non-expiring dev token for zero-latency testing
+    const isDevAuthAllowed =
+      process.env.NODE_ENV === 'development' &&
+      process.env.ENABLE_DEV_AUTH_BYPASS === 'true';
+
+    if (isDevAuthAllowed && token.startsWith('dev_')) {
+      const devIdentifier = token.replace(/^dev_/, '');
+      let devUser: RequestUser | null = null;
+      if (this.prisma?.user?.findFirst) {
+        devUser = await this.prisma.user.findFirst({
+          where:
+            devIdentifier === 'operator' || devIdentifier === 'admin'
+              ? { role: devIdentifier }
+              : { OR: [{ id: devIdentifier }, { email: devIdentifier }] },
+          select: { id: true, role: true, barangayId: true, status: true },
+        });
+        if (!devUser) {
+          devUser = await this.prisma.user.findFirst({
+            select: { id: true, role: true, barangayId: true, status: true },
+          });
+        }
+      }
+
+      request.user = {
+        id: devUser?.id ?? 'dev_user_1',
+        role: devUser?.role ?? 'operator',
+        barangayId: devUser?.barangayId ?? null,
+        status: devUser?.status ?? 'active',
+      };
+      return true;
+    }
+
     let payload: { sub: string };
     try {
       payload = await verifyToken(token, {

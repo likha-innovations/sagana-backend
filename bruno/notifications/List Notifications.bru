@@ -1,0 +1,21 @@
+meta {
+  name: List Notifications
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/notifications
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~unreadOnly: true
+  ~limit: 50
+  ~offset: 0
+}
+
+auth:bearer {
+  token: {{token}}
+}

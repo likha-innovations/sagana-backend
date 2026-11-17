@@ -1,0 +1,19 @@
+meta {
+  name: Mark As Read
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/notifications/:id/read
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: notif123
+}
+
+auth:bearer {
+  token: {{token}}
+}

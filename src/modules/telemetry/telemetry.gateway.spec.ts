@@ -28,6 +28,7 @@ describe('TelemetryGateway', () => {
     mockPrisma = {
       user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
 
@@ -95,6 +96,92 @@ describe('TelemetryGateway', () => {
 
     expect(mockServer.to).toHaveBeenCalledWith('barangay:brgy-123');
     expect(mockRoom.emit).toHaveBeenCalledWith('automation_log', logData);
+  });
+
+  it('should broadcast notification to specific barangay room', () => {
+    const notificationData = {
+      id: 'notif-1',
+      title: 'Machine Offline',
+      message: 'Machine 1 is offline',
+      severity: 'warning',
+    };
+    gateway.broadcastNotification('brgy-123', notificationData);
+
+    expect(mockServer.to).toHaveBeenCalledWith('barangay:brgy-123');
+    expect(mockRoom.emit).toHaveBeenCalledWith(
+      'notification',
+      notificationData,
+    );
+  });
+
+  it('should allow client to join barangay room via handleJoinBarangay', async () => {
+    const mockSocket = {
+      id: 'test-socket-1',
+      data: { barangayId: 'brgy-123' },
+      join: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const result = await gateway.handleJoinBarangay(
+      { barangayId: 'brgy-123' },
+      mockSocket,
+    );
+
+    expect(mockSocket.join).toHaveBeenCalledWith('barangay:brgy-123');
+    expect(result).toEqual({ status: 'joined', room: 'barangay:brgy-123' });
+  });
+
+  it('should reject handleJoinBarangay when client has no authenticated barangayId', async () => {
+    const mockSocket = {
+      id: 'unauth-socket',
+      data: {},
+      join: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const result = await gateway.handleJoinBarangay(
+      { barangayId: 'brgy-spoofed' },
+      mockSocket,
+    );
+
+    expect(mockSocket.join).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'rejected',
+      reason: 'Unauthenticated or no assigned barangay',
+    });
+  });
+
+  it('should authenticate client with dev token in development when ENABLE_DEV_AUTH_BYPASS is true', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalBypass = process.env.ENABLE_DEV_AUTH_BYPASS;
+    process.env.NODE_ENV = 'development';
+    process.env.ENABLE_DEV_AUTH_BYPASS = 'true';
+
+    try {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'dev_op_1',
+        barangayId: 'brgy_dev_1',
+      });
+
+      const mockSocket = {
+        id: 'dev-socket-1',
+        handshake: {
+          auth: { token: 'Bearer dev_operator' },
+          headers: {},
+        },
+        data: {},
+        join: jest.fn().mockResolvedValue(undefined),
+        disconnect: jest.fn(),
+      } as any;
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(mockSocket.join).toHaveBeenCalledWith('barangay:brgy_dev_1');
+      expect(mockSocket.data.userId).toBe('dev_op_1');
+      expect(mockSocket.data.barangayId).toBe('brgy_dev_1');
+      expect(mockSocket.disconnect).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      process.env.ENABLE_DEV_AUTH_BYPASS = originalBypass;
+    }
   });
 
   it('should route command to the device-specific MQTT topic', async () => {
