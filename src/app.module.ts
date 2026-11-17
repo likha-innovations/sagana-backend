@@ -14,6 +14,7 @@ import { FeedstocksModule } from './modules/feedstocks/feedstocks.module';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ClerkAuthGuard } from './core/guards/clerk-auth.guard';
 import { BatchesModule } from './modules/batches/batches.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 @Module({
@@ -38,6 +39,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
     MachinesModule,
     FeedstocksModule,
     BatchesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [
