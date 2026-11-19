@@ -183,6 +183,7 @@ describe('TelemetryService', () => {
       id: 'machine_1',
       name: 'Composter 1',
       barangayId: 'brgy_1',
+      status: 'active',
     });
 
     const statusPayload = Buffer.from(JSON.stringify({ status: 'offline' }));
@@ -209,6 +210,60 @@ describe('TelemetryService', () => {
         severity: 'warning',
       }),
     );
+  });
+
+  it('should create and broadcast an info notification when machine transitions from offline to online', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      status: 'offline',
+    });
+
+    const statusPayload = Buffer.from(JSON.stringify({ status: 'online' }));
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/status',
+      statusPayload,
+    );
+
+    expect(prisma.notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        barangayId: 'brgy_1',
+        machineId: 'machine_1',
+        type: 'machine',
+        severity: 'info',
+        title: 'Composter 1 Back Online',
+      }),
+    });
+
+    expect(gateway.broadcastNotification).toHaveBeenCalledWith(
+      'brgy_1',
+      expect.objectContaining({
+        barangayId: 'brgy_1',
+        type: 'machine',
+        severity: 'info',
+      }),
+    );
+  });
+
+  it('should not duplicate notifications if status has not changed', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      status: 'offline',
+    });
+
+    const statusPayload = Buffer.from(JSON.stringify({ status: 'offline' }));
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/status',
+      statusPayload,
+    );
+
+    expect(prisma.notification.create).not.toHaveBeenCalled();
+    expect(gateway.broadcastNotification).not.toHaveBeenCalled();
   });
 
   it('should create and broadcast a critical notification on emergency stop event', async () => {

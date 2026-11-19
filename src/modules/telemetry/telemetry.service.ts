@@ -44,7 +44,7 @@ export class TelemetryService implements OnModuleInit {
 
         const machine = await this.prisma.machine.findUnique({
           where: { macAddress },
-          select: { id: true, name: true, barangayId: true },
+          select: { id: true, name: true, barangayId: true, status: true },
         });
 
         if (!machine) {
@@ -57,6 +57,7 @@ export class TelemetryService implements OnModuleInit {
 
         const isOnline = statusData.status === 'online';
         const machineStatus = isOnline ? 'active' : 'offline';
+        const previousStatus = machine.status;
 
         await this.prisma.machine.update({
           where: { macAddress },
@@ -67,7 +68,7 @@ export class TelemetryService implements OnModuleInit {
         });
 
         this.logger.log(
-          `📡 [Device Status] MAC=${macAddress} (id=${machine.id}): ${machineStatus}`,
+          `📡 [Device Status] MAC=${macAddress} (id=${machine.id}): ${machineStatus} (was ${previousStatus})`,
           TelemetryService.name,
         );
 
@@ -85,34 +86,65 @@ export class TelemetryService implements OnModuleInit {
           barangayId: machine.barangayId,
         });
 
-        // Generate and broadcast alert if machine transitions to offline
-        if (!isOnline && machine.barangayId) {
-          const notif = await this.prisma.notification.create({
-            data: {
-              barangayId: machine.barangayId,
-              machineId: machine.id,
-              type: 'machine',
-              severity: 'warning',
-              title: `${machine.name || 'Machine'} Offline`,
-              message: `${machine.name || 'Machine'} (${macAddress}) has disconnected or gone offline.`,
-              metadata: { macAddress, status: machineStatus },
-            },
-          });
-          this.telemetryGateway.broadcastNotification(machine.barangayId, {
-            id: notif.id,
-            barangayId: notif.barangayId,
-            machineId: notif.machineId,
-            batchId: notif.batchId,
-            userId: notif.userId,
-            type: notif.type,
-            severity: notif.severity,
-            title: notif.title,
-            message: notif.message,
-            metadata: notif.metadata,
-            isRead: notif.isRead,
-            readAt: notif.readAt ? notif.readAt.toISOString() : null,
-            createdAt: notif.createdAt.toISOString(),
-          });
+        // Generate and broadcast alert only on state transition to avoid spamming
+        const hasTransitioned = previousStatus !== machineStatus;
+
+        if (hasTransitioned && machine.barangayId) {
+          if (!isOnline) {
+            const notif = await this.prisma.notification.create({
+              data: {
+                barangayId: machine.barangayId,
+                machineId: machine.id,
+                type: 'machine',
+                severity: 'warning',
+                title: `${machine.name || 'Machine'} Offline`,
+                message: `${machine.name || 'Machine'} (${macAddress}) has disconnected or gone offline.`,
+                metadata: { macAddress, status: machineStatus },
+              },
+            });
+            this.telemetryGateway.broadcastNotification(machine.barangayId, {
+              id: notif.id,
+              barangayId: notif.barangayId,
+              machineId: notif.machineId,
+              batchId: notif.batchId,
+              userId: notif.userId,
+              type: notif.type,
+              severity: notif.severity,
+              title: notif.title,
+              message: notif.message,
+              metadata: notif.metadata,
+              isRead: notif.isRead,
+              readAt: notif.readAt ? notif.readAt.toISOString() : null,
+              createdAt: notif.createdAt.toISOString(),
+            });
+          } else if (previousStatus === 'offline') {
+            const notif = await this.prisma.notification.create({
+              data: {
+                barangayId: machine.barangayId,
+                machineId: machine.id,
+                type: 'machine',
+                severity: 'info',
+                title: `${machine.name || 'Machine'} Back Online`,
+                message: `${machine.name || 'Machine'} (${macAddress}) has reconnected and resumed telemetry streaming.`,
+                metadata: { macAddress, status: machineStatus },
+              },
+            });
+            this.telemetryGateway.broadcastNotification(machine.barangayId, {
+              id: notif.id,
+              barangayId: notif.barangayId,
+              machineId: notif.machineId,
+              batchId: notif.batchId,
+              userId: notif.userId,
+              type: notif.type,
+              severity: notif.severity,
+              title: notif.title,
+              message: notif.message,
+              metadata: notif.metadata,
+              isRead: notif.isRead,
+              readAt: notif.readAt ? notif.readAt.toISOString() : null,
+              createdAt: notif.createdAt.toISOString(),
+            });
+          }
         }
         return;
       }

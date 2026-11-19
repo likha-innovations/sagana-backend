@@ -80,12 +80,15 @@ All routes are protected by `ClerkAuthGuard` and automatically scope queries to 
 The backend automatically creates database records and dispatches alerts over Socket.IO when specific telemetry conditions are met in `TelemetryService`:
 
 1. **Machine Offline (`warning`)**:
-   - Triggered when device status drops or MQTT Last Will and Testament (LWT) fires (`sagana/devices/:mac/status` with `status: offline`).
+   - Triggered when device transitions from online to offline (`sagana/devices/:mac/status` with `status: offline`). Repeated offline pings are de-duplicated and will not re-trigger notifications.
    - Title: `"{Machine Name} Offline"`.
-2. **Emergency Stop / Alarms (`critical`)**:
+2. **Machine Back Online (`info`)**:
+   - Triggered when a previously offline machine reconnects (`sagana/devices/:mac/status` with `status: online`).
+   - Title: `"{Machine Name} Back Online"`.
+3. **Emergency Stop / Alarms (`critical`)**:
    - Triggered by discrete safety events on `sagana/devices/:mac/events` with `type: emergency_stop`, `e_stop`, or `alarm`.
    - Title: `"Emergency Stop Triggered"`.
-3. **Core Overheat Alert (`critical`)**:
+4. **Core Overheat Alert (`critical`)**:
    - Triggered when continuous telemetry on `sagana/devices/:mac/telemetry` reports `temperature > 75°C`.
    - Title: `"High Temperature Alert"`.
 
