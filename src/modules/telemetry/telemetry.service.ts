@@ -431,6 +431,14 @@ export class TelemetryService implements OnModuleInit {
         return 'Compost middle door opened';
       case 'middle_door_closed':
         return 'Compost middle door closed';
+      case 'actuator_extending':
+        return 'Linear actuator raising floor';
+      case 'actuator_extended':
+        return 'Linear actuator floor raised';
+      case 'actuator_retracting':
+        return 'Linear actuator dropping floor';
+      case 'actuator_retracted':
+        return 'Linear actuator floor lowered';
       default:
         return `Automation event: ${type}`;
     }
