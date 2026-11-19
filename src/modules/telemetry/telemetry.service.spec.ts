@@ -199,6 +199,7 @@ describe('TelemetryService', () => {
         type: 'machine',
         severity: 'warning',
         title: 'Composter 1 Offline',
+        message: 'Composter 1 has disconnected or gone offline.',
       }),
     });
 
@@ -234,6 +235,7 @@ describe('TelemetryService', () => {
         type: 'machine',
         severity: 'info',
         title: 'Composter 1 Back Online',
+        message: 'Composter 1 has reconnected and resumed telemetry streaming.',
       }),
     });
 
@@ -303,6 +305,77 @@ describe('TelemetryService', () => {
         severity: 'critical',
       }),
     );
+  });
+
+  it('should create and broadcast info notifications for top lid and middle door events without mac in message', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+
+    const doorEvents = [
+      {
+        type: 'top_lid_opened',
+        expectedTitle: 'Composter 1 Top Lid Opened',
+        message: 'Feedstock top lid opened',
+      },
+      {
+        type: 'top_lid_closed',
+        expectedTitle: 'Composter 1 Top Lid Closed',
+        message: 'Feedstock top lid closed',
+      },
+      {
+        type: 'middle_door_opened',
+        expectedTitle: 'Composter 1 Middle Door Opened',
+        message: 'Compost middle door opened',
+      },
+      {
+        type: 'middle_door_closed',
+        expectedTitle: 'Composter 1 Middle Door Closed',
+        message: 'Compost middle door closed',
+      },
+    ];
+
+    for (const evt of doorEvents) {
+      prisma.notification.create.mockClear();
+      gateway.broadcastNotification.mockClear();
+
+      const payload = Buffer.from(
+        JSON.stringify({
+          type: evt.type,
+          message: evt.message,
+        }),
+      );
+
+      await service.handleIncomingMqttMessage(
+        'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+        payload,
+      );
+
+      expect(prisma.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          barangayId: 'brgy_1',
+          machineId: 'machine_1',
+          type: 'machine',
+          severity: 'info',
+          title: evt.expectedTitle,
+          message: `Composter 1: ${evt.message}`,
+        }),
+      });
+
+      expect(gateway.broadcastNotification).toHaveBeenCalledWith(
+        'brgy_1',
+        expect.objectContaining({
+          barangayId: 'brgy_1',
+          type: 'machine',
+          severity: 'info',
+          title: evt.expectedTitle,
+        }),
+      );
+    }
   });
 
   it('should create and broadcast a critical sensor notification when temperature exceeds threshold', async () => {

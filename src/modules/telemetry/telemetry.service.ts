@@ -98,7 +98,7 @@ export class TelemetryService implements OnModuleInit {
                 type: 'machine',
                 severity: 'warning',
                 title: `${machine.name || 'Machine'} Offline`,
-                message: `${machine.name || 'Machine'} (${macAddress}) has disconnected or gone offline.`,
+                message: `${machine.name || 'Machine'} has disconnected or gone offline.`,
                 metadata: { macAddress, status: machineStatus },
               },
             });
@@ -125,7 +125,7 @@ export class TelemetryService implements OnModuleInit {
                 type: 'machine',
                 severity: 'info',
                 title: `${machine.name || 'Machine'} Back Online`,
-                message: `${machine.name || 'Machine'} (${macAddress}) has reconnected and resumed telemetry streaming.`,
+                message: `${machine.name || 'Machine'} has reconnected and resumed telemetry streaming.`,
                 metadata: { macAddress, status: machineStatus },
               },
             });
@@ -208,23 +208,53 @@ export class TelemetryService implements OnModuleInit {
           barangayId: machine.barangayId,
         });
 
-        // Trigger critical notification on emergency stop / alarm
+        // Trigger notification on emergency stop / alarm or door/lid events
         const isCritical =
           type === 'emergency_stop' || type === 'e_stop' || type === 'alarm';
-        if (isCritical && machine.barangayId) {
+        const isDoorEvent =
+          type === 'top_lid_opened' ||
+          type === 'top_lid_closed' ||
+          type === 'middle_door_opened' ||
+          type === 'middle_door_closed';
+
+        if ((isCritical || isDoorEvent) && machine.barangayId) {
+          let title = 'Emergency Stop Triggered';
+          let severity = 'critical';
+          let notifType = 'automation';
+
+          if (isDoorEvent) {
+            severity = 'info';
+            notifType = 'machine';
+            switch (type) {
+              case 'top_lid_opened':
+                title = `${machine.name || 'Machine'} Top Lid Opened`;
+                break;
+              case 'top_lid_closed':
+                title = `${machine.name || 'Machine'} Top Lid Closed`;
+                break;
+              case 'middle_door_opened':
+                title = `${machine.name || 'Machine'} Middle Door Opened`;
+                break;
+              case 'middle_door_closed':
+                title = `${machine.name || 'Machine'} Middle Door Closed`;
+                break;
+            }
+          }
+
           const notif = await this.prisma.notification.create({
             data: {
               barangayId: machine.barangayId,
               machineId: machine.id,
               batchId: activeBatch?.id ?? null,
-              type: 'automation',
-              severity: 'critical',
-              title: 'Emergency Stop Triggered',
+              type: notifType,
+              severity,
+              title,
               message: `${machine.name || 'Machine'}: ${message}`,
               metadata: {
                 ...(metadata as Record<string, unknown>),
                 macAddress,
                 logId: log.id,
+                eventType: type,
               },
             },
           });
@@ -393,6 +423,14 @@ export class TelemetryService implements OnModuleInit {
         return `The sprinkler has been turned off as it already reached ${targetMoisture ?? '60'}%.`;
       case 'emergency_stop':
         return 'The air blower has been stopped due to an emergency.';
+      case 'top_lid_opened':
+        return 'Feedstock top lid opened';
+      case 'top_lid_closed':
+        return 'Feedstock top lid closed';
+      case 'middle_door_opened':
+        return 'Compost middle door opened';
+      case 'middle_door_closed':
+        return 'Compost middle door closed';
       default:
         return `Automation event: ${type}`;
     }
