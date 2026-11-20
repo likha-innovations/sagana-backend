@@ -286,13 +286,9 @@ export class MachinesService {
 
     const where: {
       machineId: string;
-      type?: string;
+      type: string;
       createdAt?: { gte?: Date; lte?: Date };
-    } = { machineId };
-
-    if (query.type) {
-      where.type = query.type;
-    }
+    } = { machineId, type: 'automation' };
 
     if (query.startDate || query.endDate) {
       where.createdAt = {};
@@ -306,22 +302,32 @@ export class MachinesService {
       }
     }
 
-    const logs = await this.prisma.automationLog.findMany({
+    const logs = await this.prisma.notification.findMany({
       where,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit,
       skip: query.offset,
     });
 
-    return logs.map((log) => ({
-      id: log.id,
-      machineId: log.machineId,
-      batchId: log.batchId,
-      type: log.type,
-      message: log.message,
-      metadata: log.metadata,
-      createdAt: log.createdAt.toISOString(),
-    }));
+    const filteredLogs = query.type
+      ? logs.filter((log) => {
+          const meta = log.metadata as Record<string, unknown> | null;
+          return meta?.eventType === query.type;
+        })
+      : logs;
+
+    return filteredLogs.map((log) => {
+      const meta = log.metadata as Record<string, unknown> | null;
+      return {
+        id: log.id,
+        machineId: log.machineId,
+        batchId: log.batchId,
+        type: (meta?.eventType as string) || 'blower_off',
+        message: log.message,
+        metadata: log.metadata,
+        createdAt: log.createdAt.toISOString(),
+      };
+    });
   }
 
   async getOverview(userId: string, machineId: string) {
@@ -353,31 +359,41 @@ export class MachinesService {
         actuators.pump_speed_percent > 0),
     );
 
-    const [latestBlowerLog, latestSprinklerLog] = await Promise.all([
-      this.prisma.automationLog.findFirst({
-        where: {
-          machineId,
-          type: { in: ['blower_on', 'blower_off', 'emergency_stop'] },
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      }),
-      this.prisma.automationLog.findFirst({
-        where: {
-          machineId,
-          type: {
-            in: [
-              'sprinkler_on',
-              'sprinkler_off',
-              'sprinkler_pulse_on',
-              'sprinkler_pulse_rest',
-              'moisture_dosing_start',
-              'moisture_recovery_reached',
-            ],
-          },
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      }),
-    ]);
+    const recentAutomationNotifs = await this.prisma.notification.findMany({
+      where: {
+        machineId,
+        type: 'automation',
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 20,
+    });
+
+    const blowerEventTypes = [
+      'blower_on',
+      'blower_off',
+      'emergency_stop',
+      'e_stop',
+    ];
+    const sprinklerEventTypes = [
+      'sprinkler_on',
+      'sprinkler_off',
+      'sprinkler_pulse_on',
+      'sprinkler_pulse_rest',
+      'moisture_dosing_start',
+      'moisture_recovery_reached',
+    ];
+
+    const latestBlowerLog = recentAutomationNotifs.find((n) => {
+      const meta = n.metadata as Record<string, unknown> | null;
+      const eventType = (meta?.eventType as string) ?? '';
+      return blowerEventTypes.includes(eventType);
+    });
+
+    const latestSprinklerLog = recentAutomationNotifs.find((n) => {
+      const meta = n.metadata as Record<string, unknown> | null;
+      const eventType = (meta?.eventType as string) ?? '';
+      return sprinklerEventTypes.includes(eventType);
+    });
 
     const blowerMeta =
       (latestBlowerLog?.metadata as Record<string, unknown> | null) ?? null;

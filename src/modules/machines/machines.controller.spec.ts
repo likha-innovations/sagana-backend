@@ -47,7 +47,7 @@ describe('Machine read access', () => {
     telemetryLog: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
-    automationLog: {
+    notification: {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
     },
@@ -314,15 +314,15 @@ describe('Machine read access', () => {
   describe('GET /machines/:id/automation-logs', () => {
     it('returns list of automation logs for accessible machine', async () => {
       prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
-      prisma.automationLog.findMany.mockResolvedValue([
+      prisma.notification.findMany.mockResolvedValue([
         {
           id: 'log_1',
           machineId: 'neo2',
           batchId: 'batch_neo2',
-          type: 'blower_on',
+          type: 'automation',
           message:
             'The air blower has been turned on and will be running for 5 minutes.',
-          metadata: { durationMinutes: 5 },
+          metadata: { durationMinutes: 5, eventType: 'blower_on' },
           createdAt: new Date('2026-11-12T10:00:00Z'),
         },
       ]);

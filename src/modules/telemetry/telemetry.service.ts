@@ -187,28 +187,7 @@ export class TelemetryService implements OnModuleInit {
           (eventPayload.metadata as Prisma.InputJsonObject) ??
           (eventPayload as Prisma.InputJsonObject);
 
-        const log = await this.prisma.automationLog.create({
-          data: {
-            machineId: machine.id,
-            batchId: activeBatch?.id ?? null,
-            type,
-            message,
-            metadata,
-          },
-        });
-
-        this.logger.log(
-          `⚡ [Automation Event] MAC=${macAddress} (machineId=${machine.id}): ${type} - ${message}`,
-          TelemetryService.name,
-        );
-
-        this.telemetryGateway.broadcastAutomationLog({
-          ...log,
-          macAddress,
-          barangayId: machine.barangayId,
-        });
-
-        // Trigger notification on emergency stop / alarm or door/lid events
+        // Emergency stop and alarms trigger critical notifications; doors trigger machine events
         const isCritical =
           type === 'emergency_stop' || type === 'e_stop' || type === 'alarm';
         const isDoorEvent =
@@ -217,31 +196,32 @@ export class TelemetryService implements OnModuleInit {
           type === 'middle_door_opened' ||
           type === 'middle_door_closed';
 
-        if ((isCritical || isDoorEvent) && machine.barangayId) {
-          let title = 'Emergency Stop Triggered';
-          let severity = 'critical';
-          let notifType = 'automation';
+        const notifType = isDoorEvent ? 'machine' : 'automation';
+        const severity = isCritical ? 'critical' : 'info';
+        const title = this.formatAutomationTitle(machine.name || 'Machine', type);
+        const notifMessage =
+          isCritical || isDoorEvent
+            ? `${machine.name || 'Machine'}: ${message}`
+            : message;
 
-          if (isDoorEvent) {
-            severity = 'info';
-            notifType = 'machine';
-            switch (type) {
-              case 'top_lid_opened':
-                title = `${machine.name || 'Machine'} Top Lid Opened`;
-                break;
-              case 'top_lid_closed':
-                title = `${machine.name || 'Machine'} Top Lid Closed`;
-                break;
-              case 'middle_door_opened':
-                title = `${machine.name || 'Machine'} Middle Door Opened`;
-                break;
-              case 'middle_door_closed':
-                title = `${machine.name || 'Machine'} Middle Door Closed`;
-                break;
-            }
-          }
+        let notif: {
+          id: string;
+          barangayId: string;
+          machineId: string | null;
+          batchId: string | null;
+          userId: string | null;
+          type: string;
+          severity: string;
+          title: string;
+          message: string;
+          metadata: unknown;
+          isRead: boolean;
+          readAt: Date | null;
+          createdAt: Date;
+        } | null = null;
 
-          const notif = await this.prisma.notification.create({
+        if (machine.barangayId) {
+          notif = await this.prisma.notification.create({
             data: {
               barangayId: machine.barangayId,
               machineId: machine.id,
@@ -249,31 +229,56 @@ export class TelemetryService implements OnModuleInit {
               type: notifType,
               severity,
               title,
-              message: `${machine.name || 'Machine'}: ${message}`,
+              message: notifMessage,
               metadata: {
                 ...(metadata as Record<string, unknown>),
                 macAddress,
-                logId: log.id,
                 eventType: type,
               },
             },
           });
-          this.telemetryGateway.broadcastNotification(machine.barangayId, {
-            id: notif.id,
-            barangayId: notif.barangayId,
-            machineId: notif.machineId,
-            batchId: notif.batchId,
-            userId: notif.userId,
-            type: notif.type,
-            severity: notif.severity,
-            title: notif.title,
-            message: notif.message,
-            metadata: notif.metadata,
-            isRead: notif.isRead,
-            readAt: notif.readAt ? notif.readAt.toISOString() : null,
-            createdAt: notif.createdAt.toISOString(),
-          });
+
+          // Only broadcast to notification bell feed if critical or security/door event
+          if (isCritical || isDoorEvent) {
+            this.telemetryGateway.broadcastNotification(machine.barangayId, {
+              id: notif.id,
+              barangayId: notif.barangayId,
+              machineId: notif.machineId,
+              batchId: notif.batchId,
+              userId: notif.userId,
+              type: notif.type,
+              severity: notif.severity,
+              title: notif.title,
+              message: notif.message,
+              metadata: notif.metadata,
+              isRead: notif.isRead,
+              readAt: notif.readAt ? notif.readAt.toISOString() : null,
+              createdAt: notif.createdAt.toISOString(),
+            });
+          }
         }
+
+        this.logger.log(
+          `⚡ [Automation Event] MAC=${macAddress} (machineId=${machine.id}): ${type} - ${message}`,
+          TelemetryService.name,
+        );
+
+        this.telemetryGateway.broadcastAutomationLog({
+          id: notif?.id ?? `auto-${Date.now()}`,
+          machineId: machine.id,
+          batchId: activeBatch?.id ?? null,
+          type,
+          message,
+          metadata: {
+            ...(metadata as Record<string, unknown>),
+            macAddress,
+            eventType: type,
+          },
+          createdAt: notif ? notif.createdAt.toISOString() : new Date().toISOString(),
+          macAddress,
+          barangayId: machine.barangayId,
+        });
+
         return;
       }
 
@@ -427,6 +432,52 @@ export class TelemetryService implements OnModuleInit {
       action: command.action,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private formatAutomationTitle(
+    machineName: string,
+    eventType: string,
+  ): string {
+    const prefix = machineName ? `${machineName}: ` : '';
+    switch (eventType) {
+      case 'blower_on':
+        return `${prefix}Aeration Blower Started`;
+      case 'blower_off':
+        return `${prefix}Aeration Blower Stopped`;
+      case 'sprinkler_on':
+        return `${prefix}Sprinkler Dosing Started`;
+      case 'sprinkler_off':
+        return `${prefix}Sprinkler Dosing Stopped`;
+      case 'sprinkler_pulse_on':
+        return `${prefix}Sprinkler Pulse Active`;
+      case 'sprinkler_pulse_rest':
+        return `${prefix}Sprinkler Pulse Resting`;
+      case 'moisture_dosing_start':
+        return `${prefix}Moisture Dosing Initiated`;
+      case 'moisture_recovery_reached':
+        return `${prefix}Target Moisture Reached`;
+      case 'emergency_stop':
+      case 'e_stop':
+        return 'Emergency Stop Triggered';
+      case 'top_lid_opened':
+        return `${machineName || 'Machine'} Top Lid Opened`;
+      case 'top_lid_closed':
+        return `${machineName || 'Machine'} Top Lid Closed`;
+      case 'middle_door_opened':
+        return `${machineName || 'Machine'} Middle Door Opened`;
+      case 'middle_door_closed':
+        return `${machineName || 'Machine'} Middle Door Closed`;
+      case 'actuator_extending':
+        return `${prefix}Floor Raising`;
+      case 'actuator_extended':
+        return `${prefix}Floor Raised`;
+      case 'actuator_retracting':
+        return `${prefix}Floor Lowering`;
+      case 'actuator_retracted':
+        return `${prefix}Floor Lowered`;
+      default:
+        return `${prefix}Automation Event (${eventType})`;
+    }
   }
 
   private formatAutomationMessage(

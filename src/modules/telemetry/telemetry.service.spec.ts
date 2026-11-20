@@ -37,15 +37,6 @@ describe('TelemetryService', () => {
             telemetryLog: {
               create: jest.fn(),
             },
-            automationLog: {
-              create: jest.fn().mockImplementation(({ data }) =>
-                Promise.resolve({
-                  id: 'log_1',
-                  createdAt: new Date(),
-                  ...data,
-                }),
-              ),
-            },
             notification: {
               create: jest.fn().mockImplementation(({ data }) =>
                 Promise.resolve({
@@ -125,14 +116,21 @@ describe('TelemetryService', () => {
       eventPayload,
     );
 
-    expect(prisma.automationLog.create).toHaveBeenCalledWith({
+    expect(prisma.notification.create).toHaveBeenCalledWith({
       data: {
+        barangayId: 'brgy_1',
         machineId: 'machine_1',
         batchId: 'batch_1',
-        type: 'blower_on',
+        type: 'automation',
+        severity: 'info',
+        title: 'Composter 1: Aeration Blower Started',
         message:
           'The air blower has been turned on and will be running for 5 minutes.',
-        metadata: { durationMinutes: 5 },
+        metadata: {
+          durationMinutes: 5,
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          eventType: 'blower_on',
+        },
       },
     });
 
@@ -166,13 +164,21 @@ describe('TelemetryService', () => {
       eventPayload,
     );
 
-    expect(prisma.automationLog.create).toHaveBeenCalledWith({
+    expect(prisma.notification.create).toHaveBeenCalledWith({
       data: {
+        barangayId: 'brgy_1',
         machineId: 'machine_1',
         batchId: null,
-        type: 'sprinkler_off',
+        type: 'automation',
+        severity: 'info',
+        title: 'Composter 1: Sprinkler Dosing Stopped',
         message: 'The sprinkler has been turned off as it already reached 60%.',
-        metadata: { type: 'sprinkler_off', targetMoisture: 60 },
+        metadata: {
+          type: 'sprinkler_off',
+          targetMoisture: 60,
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          eventType: 'sprinkler_off',
+        },
       },
     });
   });
@@ -417,18 +423,13 @@ describe('TelemetryService', () => {
     );
   });
 
-  it('should not allow event metadata to override macAddress and logId in notification metadata', async () => {
+  it('should not allow event metadata to override macAddress and eventType in notification metadata', async () => {
     const prisma = (service as any).prisma;
     prisma.machine.findUnique.mockResolvedValue({
       id: 'machine_1',
       name: 'Composter 1',
       barangayId: 'brgy_1',
       batches: [{ id: 'batch_1', status: 'active' }],
-    });
-    prisma.automationLog.create.mockResolvedValue({
-      id: 'authoritative_log_123',
-      machineId: 'machine_1',
-      type: 'emergency_stop',
     });
 
     const maliciousPayload = Buffer.from(
@@ -437,7 +438,7 @@ describe('TelemetryService', () => {
         message: 'E-stop pressed',
         metadata: {
           macAddress: 'SPOOFED_MAC',
-          logId: 'SPOOFED_LOG',
+          eventType: 'SPOOFED_TYPE',
           customField: 'valid_data',
         },
       }),
@@ -452,7 +453,7 @@ describe('TelemetryService', () => {
       data: expect.objectContaining({
         metadata: expect.objectContaining({
           macAddress: 'AA:BB:CC:DD:EE:FF',
-          logId: 'authoritative_log_123',
+          eventType: 'emergency_stop',
           customField: 'valid_data',
         }),
       }),
