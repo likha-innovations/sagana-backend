@@ -384,6 +384,43 @@ export class TelemetryService implements OnModuleInit {
       TelemetryService.name,
     );
 
+    // Device Twin: Persist actuator configuration changes to database
+    if (command.action === 'AERATION_CONFIG' && command.payload) {
+      try {
+        const machine = await this.prisma.machine.findUnique({
+          where: { macAddress },
+          select: { id: true, configuration: true, barangayId: true },
+        });
+        if (machine) {
+          const currentConfig =
+            (machine.configuration as Record<string, unknown> | null) ?? {};
+          const newConfig = {
+            ...currentConfig,
+            aeration: {
+              ...((currentConfig.aeration as Record<string, unknown> | null) ??
+                {}),
+              ...command.payload,
+              updatedAt: new Date().toISOString(),
+            },
+          };
+          await this.prisma.machine.update({
+            where: { id: machine.id },
+            data: { configuration: newConfig },
+          });
+
+          this.telemetryGateway.broadcastMachineUpdated({
+            machineId: machine.id,
+            barangayId: machine.barangayId,
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to persist Device Twin configuration: ${err instanceof Error ? err.message : err}`,
+          TelemetryService.name,
+        );
+      }
+    }
+
     return {
       success: true,
       macAddress,

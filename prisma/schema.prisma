@@ -46,8 +46,9 @@ model Machine {
   status     String    @default("offline")
   wifiSsid   String?   @map("wifi_ssid")
   lastSeen   DateTime? @map("last_seen")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  removedAt  DateTime? @map("removed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  removedAt     DateTime? @map("removed_at")
+  configuration Json?     @default("{}") @map("configuration")
 
   barangay       Barangay        @relation(fields: [barangayId], references: [id])
   batches        CompostBatch[]
