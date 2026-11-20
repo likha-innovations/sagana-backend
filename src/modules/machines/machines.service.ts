@@ -364,7 +364,16 @@ export class MachinesService {
       this.prisma.automationLog.findFirst({
         where: {
           machineId,
-          type: { in: ['sprinkler_on', 'sprinkler_off'] },
+          type: {
+            in: [
+              'sprinkler_on',
+              'sprinkler_off',
+              'sprinkler_pulse_on',
+              'sprinkler_pulse_rest',
+              'moisture_dosing_start',
+              'moisture_recovery_reached',
+            ],
+          },
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
