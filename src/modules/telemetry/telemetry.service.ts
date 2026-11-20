@@ -198,7 +198,10 @@ export class TelemetryService implements OnModuleInit {
 
         const notifType = isDoorEvent ? 'machine' : 'automation';
         const severity = isCritical ? 'critical' : 'info';
-        const title = this.formatAutomationTitle(machine.name || 'Machine', type);
+        const title = this.formatAutomationTitle(
+          machine.name || 'Machine',
+          type,
+        );
         const notifMessage =
           isCritical || isDoorEvent
             ? `${machine.name || 'Machine'}: ${message}`
@@ -274,7 +277,9 @@ export class TelemetryService implements OnModuleInit {
             macAddress,
             eventType: type,
           },
-          createdAt: notif ? notif.createdAt.toISOString() : new Date().toISOString(),
+          createdAt: notif
+            ? notif.createdAt.toISOString()
+            : new Date().toISOString(),
           macAddress,
           barangayId: machine.barangayId,
         });
