@@ -76,6 +76,7 @@ describe('NotificationsService', () => {
       expect(notification.findMany).toHaveBeenCalledWith({
         where: {
           barangayId: 'brgy_1',
+          type: { not: 'automation' },
           isRead: false,
         },
         orderBy: { createdAt: 'desc' },
@@ -105,6 +106,7 @@ describe('NotificationsService', () => {
       expect(notification.count).toHaveBeenCalledWith({
         where: {
           barangayId: 'brgy_1',
+          type: { not: 'automation' },
           isRead: false,
         },
       });
@@ -174,6 +176,7 @@ describe('NotificationsService', () => {
       expect(notification.updateMany).toHaveBeenCalledWith({
         where: {
           barangayId: 'brgy_1',
+          type: { not: 'automation' },
           isRead: false,
         },
         data: expect.objectContaining({

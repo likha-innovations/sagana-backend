@@ -286,13 +286,9 @@ export class MachinesService {
 
     const where: {
       machineId: string;
-      type?: string;
+      type: string;
       createdAt?: { gte?: Date; lte?: Date };
-    } = { machineId };
-
-    if (query.type) {
-      where.type = query.type;
-    }
+    } = { machineId, type: 'automation' };
 
     if (query.startDate || query.endDate) {
       where.createdAt = {};
@@ -306,22 +302,96 @@ export class MachinesService {
       }
     }
 
-    const logs = await this.prisma.automationLog.findMany({
+    const logs = await this.prisma.notification.findMany({
       where,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit,
       skip: query.offset,
     });
 
-    return logs.map((log) => ({
-      id: log.id,
-      machineId: log.machineId,
-      batchId: log.batchId,
-      type: log.type,
-      message: log.message,
-      metadata: log.metadata,
-      createdAt: log.createdAt.toISOString(),
-    }));
+    const filteredLogs = query.type
+      ? logs.filter((log) => {
+          const meta = log.metadata as Record<string, unknown> | null;
+          return meta?.eventType === query.type;
+        })
+      : logs;
+
+    return filteredLogs.map((log) => {
+      const meta = (log.metadata as Record<string, unknown> | null) ?? {};
+      let eventType = (meta.eventType as string) || log.type;
+
+      if (
+        eventType === 'aeration_state_change' ||
+        eventType === 'blower_cycle_on' ||
+        eventType === 'blower_cycle_rest'
+      ) {
+        const speed = typeof meta.speed === 'number' ? meta.speed : 0;
+        const stateStr = typeof meta.state === 'string' ? meta.state : '';
+        const isOff =
+          speed === 0 ||
+          stateStr.includes('OFF') ||
+          stateStr.includes('IDLE') ||
+          eventType === 'blower_cycle_rest';
+        eventType = isOff ? 'blower_off' : 'blower_on';
+      } else if (
+        eventType === 'moisture_dosing_start' ||
+        eventType === 'sprinkler_pulse_on'
+      ) {
+        eventType = 'sprinkler_on';
+      } else if (
+        eventType === 'moisture_recovery_reached' ||
+        eventType === 'sprinkler_pulse_rest'
+      ) {
+        eventType = 'sprinkler_off';
+      } else if (eventType === 'estop_activated' || eventType === 'e_stop') {
+        eventType = 'emergency_stop';
+      }
+
+      let formattedMessage = log.message;
+      const lower = log.message.toLowerCase();
+      const durationStr =
+        typeof meta.durationMinutes === 'number' ||
+        typeof meta.durationMinutes === 'string'
+          ? String(meta.durationMinutes)
+          : undefined;
+      const targetMoistStr =
+        typeof meta.targetMoisture === 'number' ||
+        typeof meta.targetMoisture === 'string'
+          ? String(meta.targetMoisture)
+          : undefined;
+
+      if (
+        lower.includes('state transition') ||
+        lower.includes('pulse') ||
+        lower.includes('dosing sequence') ||
+        lower.includes('hysteresis') ||
+        lower.includes('test button')
+      ) {
+        if (eventType === 'blower_on') {
+          formattedMessage = `The air blower has been turned on and will be running for ${durationStr ?? '5'} minutes.`;
+        } else if (eventType === 'blower_off') {
+          formattedMessage = `The air blower has been turned off and will be turned off for ${durationStr ?? '15'} minutes.`;
+        } else if (eventType === 'sprinkler_on') {
+          formattedMessage = `The sprinkler has been turned on and will be running until moisture hits ${targetMoistStr ?? '60'}%.`;
+        } else if (eventType === 'sprinkler_off') {
+          formattedMessage = `The sprinkler has been turned off as it already reached ${targetMoistStr ?? '60'}%.`;
+        } else if (eventType === 'emergency_stop') {
+          formattedMessage = lower.includes('sprinkler')
+            ? 'The sprinkler has been stopped due to an emergency.'
+            : 'The air blower has been stopped due to an emergency.';
+        }
+      }
+
+      return {
+        id: log.id,
+        machineId: log.machineId,
+        batchId: log.batchId,
+        type: eventType,
+        message: formattedMessage,
+        metadata: log.metadata,
+        createdAt: log.createdAt.toISOString(),
+      };
+    });
   }
 
   async getOverview(userId: string, machineId: string) {
@@ -353,30 +423,85 @@ export class MachinesService {
         actuators.pump_speed_percent > 0),
     );
 
-    const [latestBlowerLog, latestSprinklerLog] = await Promise.all([
-      this.prisma.automationLog.findFirst({
-        where: {
-          machineId,
-          type: { in: ['blower_on', 'blower_off', 'emergency_stop'] },
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      }),
-      this.prisma.automationLog.findFirst({
-        where: {
-          machineId,
-          type: { in: ['sprinkler_on', 'sprinkler_off'] },
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      }),
-    ]);
+    const recentAutomationNotifs = await this.prisma.notification.findMany({
+      where: {
+        machineId,
+        type: 'automation',
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 20,
+    });
+
+    const blowerEventTypes = [
+      'blower_on',
+      'blower_off',
+      'emergency_stop',
+      'e_stop',
+    ];
+    const sprinklerEventTypes = [
+      'sprinkler_on',
+      'sprinkler_off',
+      'sprinkler_pulse_on',
+      'sprinkler_pulse_rest',
+      'moisture_dosing_start',
+      'moisture_recovery_reached',
+    ];
+
+    const latestBlowerLog = recentAutomationNotifs.find((n) => {
+      const meta = n.metadata as Record<string, unknown> | null;
+      const eventType = (meta?.eventType as string) ?? '';
+      return blowerEventTypes.includes(eventType);
+    });
+
+    const latestSprinklerLog = recentAutomationNotifs.find((n) => {
+      const meta = n.metadata as Record<string, unknown> | null;
+      const eventType = (meta?.eventType as string) ?? '';
+      return sprinklerEventTypes.includes(eventType);
+    });
 
     const blowerMeta =
       (latestBlowerLog?.metadata as Record<string, unknown> | null) ?? null;
     const sprinklerMeta =
       (latestSprinklerLog?.metadata as Record<string, unknown> | null) ?? null;
 
+    const automation =
+      (telemetryPayload?.automation as Record<string, unknown> | null) ?? null;
+    const remainingMs =
+      typeof automation?.aeration_remaining_ms === 'number'
+        ? automation.aeration_remaining_ms
+        : typeof actuators?.blower_remaining_ms === 'number'
+          ? actuators.blower_remaining_ms
+          : null;
+
+    let dynamicUntil: string | null = null;
+    if (remainingMs !== null && remainingMs > 0) {
+      const totalSec = Math.round(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      if (mins >= 60) {
+        const hrs = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        dynamicUntil = `${hrs}h ${remMins}m`;
+      } else if (mins > 0) {
+        dynamicUntil = `${mins}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        dynamicUntil = `0:${secs.toString().padStart(2, '0')}`;
+      }
+    }
+
     const aerationUntil =
-      (blowerMeta?.until as string) || (blowerRunning ? '6:07' : '15 min');
+      dynamicUntil ||
+      (blowerMeta?.until as string) ||
+      (blowerRunning ? '10 min' : '5 min');
+
+    const targetEndTime =
+      remainingMs !== null && remainingMs > 0
+        ? new Date(
+            (latestTelemetry?.recordedAt
+              ? new Date(latestTelemetry.recordedAt).getTime()
+              : Date.now()) + remainingMs,
+          ).toISOString()
+        : null;
 
     const sprinklerUntil =
       (sprinklerMeta?.until as string) || (pumpRunning ? '60%' : '45%');
@@ -386,11 +511,15 @@ export class MachinesService {
       batchId: activeBatch?.id ?? null,
       currentWeight: activeBatch?.totalWeight ?? null,
       recordedAt: (latestTelemetry?.recordedAt ?? new Date()).toISOString(),
+      serverTime: new Date().toISOString(),
+      configuration: machine.configuration ?? {},
       automations: [
         {
           kind: 'aeration' as const,
           enabled: blowerRunning,
           until: aerationUntil,
+          targetEndTime,
+          remainingMs,
         },
         {
           kind: 'sprinkler' as const,

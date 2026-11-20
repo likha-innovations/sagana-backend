@@ -98,7 +98,7 @@ export class TelemetryService implements OnModuleInit {
                 type: 'machine',
                 severity: 'warning',
                 title: `${machine.name || 'Machine'} Offline`,
-                message: `${machine.name || 'Machine'} (${macAddress}) has disconnected or gone offline.`,
+                message: `${machine.name || 'Machine'} has disconnected or gone offline.`,
                 metadata: { macAddress, status: machineStatus },
               },
             });
@@ -125,7 +125,7 @@ export class TelemetryService implements OnModuleInit {
                 type: 'machine',
                 severity: 'info',
                 title: `${machine.name || 'Machine'} Back Online`,
-                message: `${machine.name || 'Machine'} (${macAddress}) has reconnected and resumed telemetry streaming.`,
+                message: `${machine.name || 'Machine'} has reconnected and resumed telemetry streaming.`,
                 metadata: { macAddress, status: machineStatus },
               },
             });
@@ -179,23 +179,140 @@ export class TelemetryService implements OnModuleInit {
         }
 
         const activeBatch = machine.batches[0];
-        const type = (eventPayload.type as string) || 'unknown';
-        const message =
-          (eventPayload.message as string) ||
-          this.formatAutomationMessage(type, eventPayload);
+        let type = (eventPayload.type as string) || 'unknown';
+        const metaObj =
+          (eventPayload.metadata as Record<string, unknown>) ?? eventPayload;
+
+        // Normalize legacy or raw firmware state transition event types
+        if (
+          type === 'aeration_state_change' ||
+          type === 'blower_cycle_on' ||
+          type === 'blower_cycle_rest'
+        ) {
+          const speed =
+            typeof metaObj.speed === 'number'
+              ? metaObj.speed
+              : typeof eventPayload.speed === 'number'
+                ? eventPayload.speed
+                : 0;
+          const stateStr =
+            typeof metaObj.state === 'string'
+              ? metaObj.state
+              : typeof eventPayload.state === 'string'
+                ? eventPayload.state
+                : '';
+          const isOff =
+            speed === 0 ||
+            stateStr.includes('OFF') ||
+            stateStr.includes('IDLE') ||
+            type === 'blower_cycle_rest';
+          type = isOff ? 'blower_off' : 'blower_on';
+        } else if (
+          type === 'moisture_dosing_start' ||
+          type === 'sprinkler_pulse_on'
+        ) {
+          type = 'sprinkler_on';
+        } else if (
+          type === 'moisture_recovery_reached' ||
+          type === 'sprinkler_pulse_rest'
+        ) {
+          type = 'sprinkler_off';
+        } else if (type === 'estop_activated' || type === 'e_stop') {
+          type = 'emergency_stop';
+        }
+
+        // Format user-friendly message, replacing generic transition descriptions
+        const rawMsg =
+          typeof eventPayload.message === 'string' ? eventPayload.message : '';
+        const isGenericMessage =
+          !rawMsg ||
+          rawMsg.toLowerCase().includes('state transition') ||
+          rawMsg.toLowerCase().includes('pulse') ||
+          rawMsg.toLowerCase().includes('dosing sequence') ||
+          rawMsg.toLowerCase().includes('hysteresis') ||
+          rawMsg.toLowerCase().includes('test button');
+
+        const message = isGenericMessage
+          ? this.formatAutomationMessage(type, { ...metaObj, ...eventPayload })
+          : rawMsg;
+
         const metadata =
           (eventPayload.metadata as Prisma.InputJsonObject) ??
           (eventPayload as Prisma.InputJsonObject);
 
-        const log = await this.prisma.automationLog.create({
-          data: {
-            machineId: machine.id,
-            batchId: activeBatch?.id ?? null,
-            type,
-            message,
-            metadata,
-          },
-        });
+        // Emergency stop and alarms trigger critical notifications; doors trigger machine events
+        const isCritical =
+          type === 'emergency_stop' || type === 'e_stop' || type === 'alarm';
+        const isDoorEvent =
+          type === 'top_lid_opened' ||
+          type === 'top_lid_closed' ||
+          type === 'middle_door_opened' ||
+          type === 'middle_door_closed';
+
+        const notifType = isDoorEvent ? 'machine' : 'automation';
+        const severity = isCritical ? 'critical' : 'info';
+        const title = this.formatAutomationTitle(
+          machine.name || 'Machine',
+          type,
+        );
+        const notifMessage =
+          isCritical || isDoorEvent
+            ? `${machine.name || 'Machine'}: ${message}`
+            : message;
+
+        let notif: {
+          id: string;
+          barangayId: string;
+          machineId: string | null;
+          batchId: string | null;
+          userId: string | null;
+          type: string;
+          severity: string;
+          title: string;
+          message: string;
+          metadata: unknown;
+          isRead: boolean;
+          readAt: Date | null;
+          createdAt: Date;
+        } | null = null;
+
+        if (machine.barangayId) {
+          notif = await this.prisma.notification.create({
+            data: {
+              barangayId: machine.barangayId,
+              machineId: machine.id,
+              batchId: activeBatch?.id ?? null,
+              type: notifType,
+              severity,
+              title,
+              message: notifMessage,
+              metadata: {
+                ...(metadata as Record<string, unknown>),
+                macAddress,
+                eventType: type,
+              },
+            },
+          });
+
+          // Only broadcast to notification bell feed if critical or security/door event
+          if (isCritical || isDoorEvent) {
+            this.telemetryGateway.broadcastNotification(machine.barangayId, {
+              id: notif.id,
+              barangayId: notif.barangayId,
+              machineId: notif.machineId,
+              batchId: notif.batchId,
+              userId: notif.userId,
+              type: notif.type,
+              severity: notif.severity,
+              title: notif.title,
+              message: notif.message,
+              metadata: notif.metadata,
+              isRead: notif.isRead,
+              readAt: notif.readAt ? notif.readAt.toISOString() : null,
+              createdAt: notif.createdAt.toISOString(),
+            });
+          }
+        }
 
         this.logger.log(
           `⚡ [Automation Event] MAC=${macAddress} (machineId=${machine.id}): ${type} - ${message}`,
@@ -203,47 +320,23 @@ export class TelemetryService implements OnModuleInit {
         );
 
         this.telemetryGateway.broadcastAutomationLog({
-          ...log,
+          id: notif?.id ?? `auto-${Date.now()}`,
+          machineId: machine.id,
+          batchId: activeBatch?.id ?? null,
+          type,
+          message,
+          metadata: {
+            ...(metadata as Record<string, unknown>),
+            macAddress,
+            eventType: type,
+          },
+          createdAt: notif
+            ? notif.createdAt.toISOString()
+            : new Date().toISOString(),
           macAddress,
           barangayId: machine.barangayId,
         });
 
-        // Trigger critical notification on emergency stop / alarm
-        const isCritical =
-          type === 'emergency_stop' || type === 'e_stop' || type === 'alarm';
-        if (isCritical && machine.barangayId) {
-          const notif = await this.prisma.notification.create({
-            data: {
-              barangayId: machine.barangayId,
-              machineId: machine.id,
-              batchId: activeBatch?.id ?? null,
-              type: 'automation',
-              severity: 'critical',
-              title: 'Emergency Stop Triggered',
-              message: `${machine.name || 'Machine'}: ${message}`,
-              metadata: {
-                ...(metadata as Record<string, unknown>),
-                macAddress,
-                logId: log.id,
-              },
-            },
-          });
-          this.telemetryGateway.broadcastNotification(machine.barangayId, {
-            id: notif.id,
-            barangayId: notif.barangayId,
-            machineId: notif.machineId,
-            batchId: notif.batchId,
-            userId: notif.userId,
-            type: notif.type,
-            severity: notif.severity,
-            title: notif.title,
-            message: notif.message,
-            metadata: notif.metadata,
-            isRead: notif.isRead,
-            readAt: notif.readAt ? notif.readAt.toISOString() : null,
-            createdAt: notif.createdAt.toISOString(),
-          });
-        }
         return;
       }
 
@@ -354,12 +447,95 @@ export class TelemetryService implements OnModuleInit {
       TelemetryService.name,
     );
 
+    // Device Twin: Persist actuator configuration changes to database
+    if (command.action === 'AERATION_CONFIG' && command.payload) {
+      try {
+        const machine = await this.prisma.machine.findUnique({
+          where: { macAddress },
+          select: { id: true, configuration: true, barangayId: true },
+        });
+        if (machine) {
+          const currentConfig =
+            (machine.configuration as Record<string, unknown> | null) ?? {};
+          const newConfig = {
+            ...currentConfig,
+            aeration: {
+              ...((currentConfig.aeration as Record<string, unknown> | null) ??
+                {}),
+              ...command.payload,
+              updatedAt: new Date().toISOString(),
+            },
+          };
+          await this.prisma.machine.update({
+            where: { id: machine.id },
+            data: { configuration: newConfig },
+          });
+
+          this.telemetryGateway.broadcastMachineUpdated({
+            machineId: machine.id,
+            barangayId: machine.barangayId,
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to persist Device Twin configuration: ${err instanceof Error ? err.message : err}`,
+          TelemetryService.name,
+        );
+      }
+    }
+
     return {
       success: true,
       macAddress,
       action: command.action,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private formatAutomationTitle(
+    machineName: string,
+    eventType: string,
+  ): string {
+    const prefix = machineName ? `${machineName}: ` : '';
+    switch (eventType) {
+      case 'blower_on':
+        return `${prefix}Aeration Blower Started`;
+      case 'blower_off':
+        return `${prefix}Aeration Blower Stopped`;
+      case 'sprinkler_on':
+        return `${prefix}Sprinkler Dosing Started`;
+      case 'sprinkler_off':
+        return `${prefix}Sprinkler Dosing Stopped`;
+      case 'sprinkler_pulse_on':
+        return `${prefix}Sprinkler Pulse Active`;
+      case 'sprinkler_pulse_rest':
+        return `${prefix}Sprinkler Pulse Resting`;
+      case 'moisture_dosing_start':
+        return `${prefix}Moisture Dosing Initiated`;
+      case 'moisture_recovery_reached':
+        return `${prefix}Target Moisture Reached`;
+      case 'emergency_stop':
+      case 'e_stop':
+        return 'Emergency Stop Triggered';
+      case 'top_lid_opened':
+        return `${machineName || 'Machine'} Top Lid Opened`;
+      case 'top_lid_closed':
+        return `${machineName || 'Machine'} Top Lid Closed`;
+      case 'middle_door_opened':
+        return `${machineName || 'Machine'} Middle Door Opened`;
+      case 'middle_door_closed':
+        return `${machineName || 'Machine'} Middle Door Closed`;
+      case 'actuator_extending':
+        return `${prefix}Floor Raising`;
+      case 'actuator_extended':
+        return `${prefix}Floor Raised`;
+      case 'actuator_retracting':
+        return `${prefix}Floor Lowering`;
+      case 'actuator_retracted':
+        return `${prefix}Floor Lowered`;
+      default:
+        return `${prefix}Automation Event (${eventType})`;
+    }
   }
 
   private formatAutomationMessage(
@@ -392,7 +568,36 @@ export class TelemetryService implements OnModuleInit {
       case 'sprinkler_off':
         return `The sprinkler has been turned off as it already reached ${targetMoisture ?? '60'}%.`;
       case 'emergency_stop':
+      case 'e_stop':
+      case 'estop_activated': {
+        const payloadMsg =
+          typeof payload.message === 'string'
+            ? payload.message.toLowerCase()
+            : '';
+        if (
+          payload.actuator === 'sprinkler' ||
+          payloadMsg.includes('sprinkler')
+        ) {
+          return 'The sprinkler has been stopped due to an emergency.';
+        }
         return 'The air blower has been stopped due to an emergency.';
+      }
+      case 'top_lid_opened':
+        return 'Feedstock top lid opened';
+      case 'top_lid_closed':
+        return 'Feedstock top lid closed';
+      case 'middle_door_opened':
+        return 'Compost middle door opened';
+      case 'middle_door_closed':
+        return 'Compost middle door closed';
+      case 'actuator_extending':
+        return 'Linear actuator raising floor';
+      case 'actuator_extended':
+        return 'Linear actuator floor raised';
+      case 'actuator_retracting':
+        return 'Linear actuator dropping floor';
+      case 'actuator_retracted':
+        return 'Linear actuator floor lowered';
       default:
         return `Automation event: ${type}`;
     }
