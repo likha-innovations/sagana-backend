@@ -379,9 +379,9 @@ export class MachinesService {
       (telemetryPayload?.automation as Record<string, unknown> | null) ?? null;
     const remainingMs =
       typeof automation?.aeration_remaining_ms === 'number'
-        ? (automation.aeration_remaining_ms as number)
+        ? automation.aeration_remaining_ms
         : typeof actuators?.blower_remaining_ms === 'number'
-          ? (actuators.blower_remaining_ms as number)
+          ? actuators.blower_remaining_ms
           : null;
 
     let dynamicUntil: string | null = null;
@@ -405,6 +405,15 @@ export class MachinesService {
       (blowerMeta?.until as string) ||
       (blowerRunning ? '10 min' : '5 min');
 
+    const targetEndTime =
+      remainingMs !== null && remainingMs > 0
+        ? new Date(
+            (latestTelemetry?.recordedAt
+              ? new Date(latestTelemetry.recordedAt).getTime()
+              : Date.now()) + remainingMs,
+          ).toISOString()
+        : null;
+
     const sprinklerUntil =
       (sprinklerMeta?.until as string) || (pumpRunning ? '60%' : '45%');
 
@@ -418,6 +427,8 @@ export class MachinesService {
           kind: 'aeration' as const,
           enabled: blowerRunning,
           until: aerationUntil,
+          targetEndTime,
+          remainingMs,
         },
         {
           kind: 'sprinkler' as const,
