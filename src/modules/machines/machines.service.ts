@@ -422,6 +422,7 @@ export class MachinesService {
       batchId: activeBatch?.id ?? null,
       currentWeight: activeBatch?.totalWeight ?? null,
       recordedAt: (latestTelemetry?.recordedAt ?? new Date()).toISOString(),
+      serverTime: new Date().toISOString(),
       configuration: machine.configuration ?? {},
       automations: [
         {
