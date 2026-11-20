@@ -375,8 +375,35 @@ export class MachinesService {
     const sprinklerMeta =
       (latestSprinklerLog?.metadata as Record<string, unknown> | null) ?? null;
 
+    const automation =
+      (telemetryPayload?.automation as Record<string, unknown> | null) ?? null;
+    const remainingMs =
+      typeof automation?.aeration_remaining_ms === 'number'
+        ? (automation.aeration_remaining_ms as number)
+        : typeof actuators?.blower_remaining_ms === 'number'
+          ? (actuators.blower_remaining_ms as number)
+          : null;
+
+    let dynamicUntil: string | null = null;
+    if (remainingMs !== null && remainingMs > 0) {
+      const totalSec = Math.round(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      if (mins >= 60) {
+        const hrs = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        dynamicUntil = `${hrs}h ${remMins}m`;
+      } else if (mins > 0) {
+        dynamicUntil = `${mins}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        dynamicUntil = `0:${secs.toString().padStart(2, '0')}`;
+      }
+    }
+
     const aerationUntil =
-      (blowerMeta?.until as string) || (blowerRunning ? '6:07' : '15 min');
+      dynamicUntil ||
+      (blowerMeta?.until as string) ||
+      (blowerRunning ? '10 min' : '5 min');
 
     const sprinklerUntil =
       (sprinklerMeta?.until as string) || (pumpRunning ? '60%' : '45%');
