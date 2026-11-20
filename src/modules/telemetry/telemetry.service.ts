@@ -293,7 +293,7 @@ export class TelemetryService implements OnModuleInit {
       // Look up machine by MAC to get the DB machineId
       const machine = await this.prisma.machine.findUnique({
         where: { macAddress },
-        select: { id: true, name: true, barangayId: true },
+        select: { id: true, name: true, barangayId: true, configuration: true },
       });
 
       if (!machine) {
@@ -304,10 +304,37 @@ export class TelemetryService implements OnModuleInit {
         return;
       }
 
+      // Automatically seed Device Twin configuration if currently empty
+      const autoObj = parsedData.automation as
+        | Record<string, unknown>
+        | undefined;
+      const currentConfig =
+        (machine.configuration as Record<string, unknown> | null) ?? {};
+      const configUpdate =
+        !currentConfig.aeration &&
+        autoObj &&
+        typeof autoObj.aeration_mode === 'string' &&
+        typeof autoObj.aeration_on_minutes === 'number' &&
+        typeof autoObj.aeration_off_minutes === 'number'
+          ? {
+              ...currentConfig,
+              aeration: {
+                mode: autoObj.aeration_mode,
+                onMinutes: autoObj.aeration_on_minutes,
+                offMinutes: autoObj.aeration_off_minutes,
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          : undefined;
+
       // Update lastSeen timestamp, ensure active status & persist raw telemetry
       await this.prisma.machine.update({
         where: { macAddress },
-        data: { lastSeen: new Date(), status: 'active' },
+        data: {
+          lastSeen: new Date(),
+          status: 'active',
+          ...(configUpdate ? { configuration: configUpdate } : {}),
+        },
       });
 
       await this.prisma.telemetryLog.create({
