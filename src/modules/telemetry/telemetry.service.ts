@@ -179,10 +179,63 @@ export class TelemetryService implements OnModuleInit {
         }
 
         const activeBatch = machine.batches[0];
-        const type = (eventPayload.type as string) || 'unknown';
-        const message =
-          (eventPayload.message as string) ||
-          this.formatAutomationMessage(type, eventPayload);
+        let type = (eventPayload.type as string) || 'unknown';
+        const metaObj =
+          (eventPayload.metadata as Record<string, unknown>) ?? eventPayload;
+
+        // Normalize legacy or raw firmware state transition event types
+        if (
+          type === 'aeration_state_change' ||
+          type === 'blower_cycle_on' ||
+          type === 'blower_cycle_rest'
+        ) {
+          const speed =
+            typeof metaObj.speed === 'number'
+              ? metaObj.speed
+              : typeof eventPayload.speed === 'number'
+                ? eventPayload.speed
+                : 0;
+          const stateStr =
+            typeof metaObj.state === 'string'
+              ? metaObj.state
+              : typeof eventPayload.state === 'string'
+                ? eventPayload.state
+                : '';
+          const isOff =
+            speed === 0 ||
+            stateStr.includes('OFF') ||
+            stateStr.includes('IDLE') ||
+            type === 'blower_cycle_rest';
+          type = isOff ? 'blower_off' : 'blower_on';
+        } else if (
+          type === 'moisture_dosing_start' ||
+          type === 'sprinkler_pulse_on'
+        ) {
+          type = 'sprinkler_on';
+        } else if (
+          type === 'moisture_recovery_reached' ||
+          type === 'sprinkler_pulse_rest'
+        ) {
+          type = 'sprinkler_off';
+        } else if (type === 'estop_activated' || type === 'e_stop') {
+          type = 'emergency_stop';
+        }
+
+        // Format user-friendly message, replacing generic transition descriptions
+        const rawMsg =
+          typeof eventPayload.message === 'string' ? eventPayload.message : '';
+        const isGenericMessage =
+          !rawMsg ||
+          rawMsg.toLowerCase().includes('state transition') ||
+          rawMsg.toLowerCase().includes('pulse') ||
+          rawMsg.toLowerCase().includes('dosing sequence') ||
+          rawMsg.toLowerCase().includes('hysteresis') ||
+          rawMsg.toLowerCase().includes('test button');
+
+        const message = isGenericMessage
+          ? this.formatAutomationMessage(type, { ...metaObj, ...eventPayload })
+          : rawMsg;
+
         const metadata =
           (eventPayload.metadata as Prisma.InputJsonObject) ??
           (eventPayload as Prisma.InputJsonObject);
@@ -515,7 +568,20 @@ export class TelemetryService implements OnModuleInit {
       case 'sprinkler_off':
         return `The sprinkler has been turned off as it already reached ${targetMoisture ?? '60'}%.`;
       case 'emergency_stop':
+      case 'e_stop':
+      case 'estop_activated': {
+        const payloadMsg =
+          typeof payload.message === 'string'
+            ? payload.message.toLowerCase()
+            : '';
+        if (
+          payload.actuator === 'sprinkler' ||
+          payloadMsg.includes('sprinkler')
+        ) {
+          return 'The sprinkler has been stopped due to an emergency.';
+        }
         return 'The air blower has been stopped due to an emergency.';
+      }
       case 'top_lid_opened':
         return 'Feedstock top lid opened';
       case 'top_lid_closed':

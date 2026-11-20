@@ -317,13 +317,77 @@ export class MachinesService {
       : logs;
 
     return filteredLogs.map((log) => {
-      const meta = log.metadata as Record<string, unknown> | null;
+      const meta = (log.metadata as Record<string, unknown> | null) ?? {};
+      let eventType = (meta.eventType as string) || log.type;
+
+      if (
+        eventType === 'aeration_state_change' ||
+        eventType === 'blower_cycle_on' ||
+        eventType === 'blower_cycle_rest'
+      ) {
+        const speed = typeof meta.speed === 'number' ? meta.speed : 0;
+        const stateStr = typeof meta.state === 'string' ? meta.state : '';
+        const isOff =
+          speed === 0 ||
+          stateStr.includes('OFF') ||
+          stateStr.includes('IDLE') ||
+          eventType === 'blower_cycle_rest';
+        eventType = isOff ? 'blower_off' : 'blower_on';
+      } else if (
+        eventType === 'moisture_dosing_start' ||
+        eventType === 'sprinkler_pulse_on'
+      ) {
+        eventType = 'sprinkler_on';
+      } else if (
+        eventType === 'moisture_recovery_reached' ||
+        eventType === 'sprinkler_pulse_rest'
+      ) {
+        eventType = 'sprinkler_off';
+      } else if (eventType === 'estop_activated' || eventType === 'e_stop') {
+        eventType = 'emergency_stop';
+      }
+
+      let formattedMessage = log.message;
+      const lower = log.message.toLowerCase();
+      const durationStr =
+        typeof meta.durationMinutes === 'number' ||
+        typeof meta.durationMinutes === 'string'
+          ? String(meta.durationMinutes)
+          : undefined;
+      const targetMoistStr =
+        typeof meta.targetMoisture === 'number' ||
+        typeof meta.targetMoisture === 'string'
+          ? String(meta.targetMoisture)
+          : undefined;
+
+      if (
+        lower.includes('state transition') ||
+        lower.includes('pulse') ||
+        lower.includes('dosing sequence') ||
+        lower.includes('hysteresis') ||
+        lower.includes('test button')
+      ) {
+        if (eventType === 'blower_on') {
+          formattedMessage = `The air blower has been turned on and will be running for ${durationStr ?? '5'} minutes.`;
+        } else if (eventType === 'blower_off') {
+          formattedMessage = `The air blower has been turned off and will be turned off for ${durationStr ?? '15'} minutes.`;
+        } else if (eventType === 'sprinkler_on') {
+          formattedMessage = `The sprinkler has been turned on and will be running until moisture hits ${targetMoistStr ?? '60'}%.`;
+        } else if (eventType === 'sprinkler_off') {
+          formattedMessage = `The sprinkler has been turned off as it already reached ${targetMoistStr ?? '60'}%.`;
+        } else if (eventType === 'emergency_stop') {
+          formattedMessage = lower.includes('sprinkler')
+            ? 'The sprinkler has been stopped due to an emergency.'
+            : 'The air blower has been stopped due to an emergency.';
+        }
+      }
+
       return {
         id: log.id,
         machineId: log.machineId,
         batchId: log.batchId,
-        type: (meta?.eventType as string) || 'blower_off',
-        message: log.message,
+        type: eventType,
+        message: formattedMessage,
         metadata: log.metadata,
         createdAt: log.createdAt.toISOString(),
       };
