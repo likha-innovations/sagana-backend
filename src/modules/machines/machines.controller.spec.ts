@@ -339,5 +339,29 @@ describe('Machine read access', () => {
         type: 'blower_on',
       });
     });
+
+    it('applies event-type filter in database query before pagination', async () => {
+      prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
+      prisma.notification.findMany.mockResolvedValue([]);
+
+      await request(app.getHttpServer())
+        .get('/machines/neo2/automation-logs?type=blower_on&offset=0&limit=10')
+        .auth('valid', { type: 'bearer' })
+        .expect(200);
+
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            machineId: 'neo2',
+            type: 'automation',
+            OR: expect.arrayContaining([
+              { metadata: { path: ['eventType'], equals: 'blower_on' } },
+            ]),
+          }),
+          skip: 0,
+          take: 10,
+        }),
+      );
+    });
   });
 });

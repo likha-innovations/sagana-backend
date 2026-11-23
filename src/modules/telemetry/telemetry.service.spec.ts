@@ -20,6 +20,30 @@ describe('TelemetryService', () => {
       broadcastTelemetry: jest.fn(),
     };
 
+    const prismaMock: any = {
+      machine: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      telemetryLog: {
+        create: jest.fn(),
+      },
+      notification: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            id: 'notif_1',
+            isRead: false,
+            readAt: null,
+            createdAt: new Date(),
+            ...data,
+          }),
+        ),
+      },
+    };
+    prismaMock.$transaction = jest
+      .fn()
+      .mockImplementation((cb) => cb(prismaMock));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TelemetryService,
@@ -29,26 +53,7 @@ describe('TelemetryService', () => {
         },
         {
           provide: PrismaService,
-          useValue: {
-            machine: {
-              findUnique: jest.fn(),
-              update: jest.fn(),
-            },
-            telemetryLog: {
-              create: jest.fn(),
-            },
-            notification: {
-              create: jest.fn().mockImplementation(({ data }) =>
-                Promise.resolve({
-                  id: 'notif_1',
-                  isRead: false,
-                  readAt: null,
-                  createdAt: new Date(),
-                  ...data,
-                }),
-              ),
-            },
-          },
+          useValue: prismaMock,
         },
         {
           provide: LoggerService,
@@ -181,6 +186,74 @@ describe('TelemetryService', () => {
         },
       },
     });
+  });
+
+  it('should not treat absent speed as a stopped blower for blower_cycle_on', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+
+    const eventPayload = Buffer.from(
+      JSON.stringify({
+        type: 'blower_cycle_on',
+        state: 'ON',
+      }),
+    );
+
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+      eventPayload,
+    );
+
+    expect(prisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'automation',
+          metadata: expect.objectContaining({
+            eventType: 'blower_on',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should atomically persist Device Twin configuration on AERATION_CONFIG command', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      configuration: { initial: true },
+      barangayId: 'brgy_1',
+    });
+    prisma.machine.update.mockResolvedValue({
+      id: 'machine_1',
+      barangayId: 'brgy_1',
+    });
+
+    await service.sendCommandToDevice('AA:BB:CC:DD:EE:FF', {
+      action: 'AERATION_CONFIG',
+      payload: { mode: 'custom', onMinutes: 5, offMinutes: 15 },
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.machine.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'machine_1' },
+        data: {
+          configuration: expect.objectContaining({
+            initial: true,
+            aeration: expect.objectContaining({
+              mode: 'custom',
+              onMinutes: 5,
+              offMinutes: 15,
+            }),
+          }),
+        },
+      }),
+    );
   });
 
   it('should create and broadcast a warning notification when machine transitions to offline', async () => {

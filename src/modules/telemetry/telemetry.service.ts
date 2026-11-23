@@ -189,23 +189,26 @@ export class TelemetryService implements OnModuleInit {
           type === 'blower_cycle_on' ||
           type === 'blower_cycle_rest'
         ) {
-          const speed =
+          const rawSpeed =
             typeof metaObj.speed === 'number'
               ? metaObj.speed
               : typeof eventPayload.speed === 'number'
                 ? eventPayload.speed
-                : 0;
-          const stateStr =
+                : undefined;
+          const stateStr = (
             typeof metaObj.state === 'string'
               ? metaObj.state
               : typeof eventPayload.state === 'string'
                 ? eventPayload.state
-                : '';
+                : ''
+          ).toUpperCase();
           const isOff =
-            speed === 0 ||
+            type === 'blower_cycle_rest' ||
             stateStr.includes('OFF') ||
             stateStr.includes('IDLE') ||
-            type === 'blower_cycle_rest';
+            (rawSpeed === 0 &&
+              !stateStr.includes('ON') &&
+              type !== 'blower_cycle_on');
           type = isOff ? 'blower_off' : 'blower_on';
         } else if (
           type === 'moisture_dosing_start' ||
@@ -447,14 +450,16 @@ export class TelemetryService implements OnModuleInit {
       TelemetryService.name,
     );
 
-    // Device Twin: Persist actuator configuration changes to database
+    // Device Twin: Persist actuator configuration changes to database atomically
     if (command.action === 'AERATION_CONFIG' && command.payload) {
       try {
-        const machine = await this.prisma.machine.findUnique({
-          where: { macAddress },
-          select: { id: true, configuration: true, barangayId: true },
-        });
-        if (machine) {
+        const updatedMachine = await this.prisma.$transaction(async (tx) => {
+          const machine = await tx.machine.findUnique({
+            where: { macAddress },
+            select: { id: true, configuration: true, barangayId: true },
+          });
+          if (!machine) return null;
+
           const currentConfig =
             (machine.configuration as Record<string, unknown> | null) ?? {};
           const newConfig = {
@@ -466,14 +471,17 @@ export class TelemetryService implements OnModuleInit {
               updatedAt: new Date().toISOString(),
             },
           };
-          await this.prisma.machine.update({
+          return tx.machine.update({
             where: { id: machine.id },
             data: { configuration: newConfig },
+            select: { id: true, barangayId: true },
           });
+        });
 
+        if (updatedMachine) {
           this.telemetryGateway.broadcastMachineUpdated({
-            machineId: machine.id,
-            barangayId: machine.barangayId,
+            machineId: updatedMachine.id,
+            barangayId: updatedMachine.barangayId,
           });
         }
       } catch (err) {
