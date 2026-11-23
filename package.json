@@ -9,7 +9,10 @@
   "scripts": {
     "build": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start --watch",
+    "start": "dotenv run --override -f .env -- nest start --watch",
+    "start:local": "dotenv run --override -f .env.local -- nest start --watch",
+    "start:dev": "dotenv run --override -f .env.dev -- nest start --watch",
+    "start:staging": "dotenv run --override -f .env -- nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -31,7 +34,12 @@
     "db:migrate:local": "dotenv run --override -f .env.local -- prisma migrate dev",
     "db:seed:local": "dotenv run --override -f .env.local -- prisma db seed",
     "db:studio:local": "dotenv run --override -f .env.local -- prisma studio",
-    "start:local": "dotenv run --override -f .env.local -- nest start --watch"
+    "db:migrate:dev": "dotenv run --override -f .env.dev -- prisma migrate dev",
+    "db:seed:dev": "dotenv run --override -f .env.dev -- prisma db seed",
+    "db:studio:dev": "dotenv run --override -f .env.dev -- prisma studio",
+    "db:migrate:staging": "dotenv run --override -f .env -- prisma migrate dev",
+    "db:seed:staging": "dotenv run --override -f .env -- prisma db seed",
+    "db:studio:staging": "dotenv run --override -f .env -- prisma studio"
   },
   "dependencies": {
     "@clerk/backend": "^3.16.1",
