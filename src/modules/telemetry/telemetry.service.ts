@@ -206,9 +206,7 @@ export class TelemetryService implements OnModuleInit {
             type === 'blower_cycle_rest' ||
             stateStr.includes('OFF') ||
             stateStr.includes('IDLE') ||
-            (rawSpeed === 0 &&
-              !stateStr.includes('ON') &&
-              type !== 'blower_cycle_on');
+            rawSpeed === 0;
           type = isOff ? 'blower_off' : 'blower_on';
         } else if (
           type === 'moisture_dosing_start' ||
@@ -452,12 +450,18 @@ export class TelemetryService implements OnModuleInit {
 
     // Device Twin: Persist actuator configuration changes to database atomically
     if (command.action === 'AERATION_CONFIG' && command.payload) {
-      try {
-        const updatedMachine = await this.prisma.$transaction(async (tx) => {
-          const machine = await tx.machine.findUnique({
-            where: { macAddress },
-            select: { id: true, configuration: true, barangayId: true },
-          });
+      const updatedMachine = await this.prisma.$transaction(
+        async (tx) => {
+          // Serialize merges for this machine; a lock failure rejects the
+          // request without retrying the command already published to MQTT.
+          const [machine] = await tx.$queryRaw<
+            { id: string; configuration: Prisma.JsonValue }[]
+          >`
+            SELECT "machine_id" AS id, "configuration"
+            FROM "machines"
+            WHERE "mac_address" = ${macAddress}
+            FOR UPDATE
+          `;
           if (!machine) return null;
 
           const currentConfig =
@@ -476,19 +480,15 @@ export class TelemetryService implements OnModuleInit {
             data: { configuration: newConfig },
             select: { id: true, barangayId: true },
           });
-        });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+      );
 
-        if (updatedMachine) {
-          this.telemetryGateway.broadcastMachineUpdated({
-            machineId: updatedMachine.id,
-            barangayId: updatedMachine.barangayId,
-          });
-        }
-      } catch (err) {
-        this.logger.warn(
-          `Failed to persist Device Twin configuration: ${err instanceof Error ? err.message : err}`,
-          TelemetryService.name,
-        );
+      if (updatedMachine) {
+        this.telemetryGateway.broadcastMachineUpdated({
+          machineId: updatedMachine.id,
+          barangayId: updatedMachine.barangayId,
+        });
       }
     }
 

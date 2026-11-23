@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type Notification } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
@@ -15,10 +15,6 @@ import type { AutomationLogsQueryDto } from './dto/automation-logs-query.dto';
 
 function getEventTypeAliases(type: string): string[] {
   switch (type) {
-    case 'blower_on':
-      return ['blower_on', 'blower_cycle_on', 'aeration_state_change'];
-    case 'blower_off':
-      return ['blower_off', 'blower_cycle_rest', 'aeration_state_change'];
     case 'sprinkler_on':
       return ['sprinkler_on', 'moisture_dosing_start', 'sprinkler_pulse_on'];
     case 'sprinkler_off':
@@ -311,19 +307,18 @@ export class MachinesService {
       type: 'automation',
     };
 
-    if (query.startDate || query.endDate) {
-      where.createdAt = {};
-      if (query.startDate) {
-        where.createdAt.gte = new Date(query.startDate);
-      }
-      if (query.endDate) {
-        where.createdAt.lte = query.endDate.includes('T')
-          ? new Date(query.endDate)
-          : new Date(`${query.endDate}T23:59:59.999Z`);
-      }
+    const dates: { gte?: Date; lte?: Date } = {};
+    if (query.startDate) dates.gte = new Date(query.startDate);
+    if (query.endDate) {
+      dates.lte = query.endDate.includes('T')
+        ? new Date(query.endDate)
+        : new Date(`${query.endDate}T23:59:59.999Z`);
     }
+    if (dates.gte || dates.lte) where.createdAt = dates;
 
-    if (query.type) {
+    const isBlowerFilter =
+      query.type === 'blower_on' || query.type === 'blower_off';
+    if (query.type && !isBlowerFilter) {
       const aliases = getEventTypeAliases(query.type);
       where.OR = aliases.map((alias) => ({
         metadata: {
@@ -333,12 +328,14 @@ export class MachinesService {
       }));
     }
 
-    const logs = await this.prisma.notification.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: query.limit,
-      skip: query.offset,
-    });
+    const logs = isBlowerFilter
+      ? await this.findBlowerLogs(machineId, query, dates)
+      : await this.prisma.notification.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: query.limit,
+          skip: query.offset,
+        });
 
     return logs.map((log) => {
       const meta = (log.metadata as Record<string, unknown> | null) ?? {};
@@ -358,9 +355,7 @@ export class MachinesService {
           eventType === 'blower_cycle_rest' ||
           stateStr.includes('OFF') ||
           stateStr.includes('IDLE') ||
-          (rawSpeed === 0 &&
-            !stateStr.includes('ON') &&
-            eventType !== 'blower_cycle_on');
+          rawSpeed === 0;
         eventType = isOff ? 'blower_off' : 'blower_on';
       } else if (
         eventType === 'moisture_dosing_start' ||
@@ -421,6 +416,54 @@ export class MachinesService {
         createdAt: log.createdAt.toISOString(),
       };
     });
+  }
+
+  private findBlowerLogs(
+    machineId: string,
+    query: AutomationLogsQueryDto,
+    dates: { gte?: Date; lte?: Date },
+  ) {
+    const off = query.type === 'blower_off';
+    // Legacy transition records can represent either state. Match the same
+    // numeric zero and state rules as the response mapping before pagination.
+    const legacyOff = Prisma.sql`
+      COALESCE(metadata->'speed' = '0'::jsonb, false)
+      OR COALESCE(
+        jsonb_typeof(metadata->'state') = 'string'
+        AND metadata->>'state' ~* '(off|idle)',
+        false
+      )
+    `;
+    return this.prisma.$queryRaw<
+      Pick<
+        Notification,
+        | 'id'
+        | 'machineId'
+        | 'batchId'
+        | 'type'
+        | 'message'
+        | 'metadata'
+        | 'createdAt'
+      >[]
+    >`
+      SELECT notification_id AS id, machine_id AS "machineId",
+             batch_id AS "batchId", type, message, metadata,
+             created_at AS "createdAt"
+      FROM notifications
+      WHERE machine_id = ${machineId} AND type = 'automation'
+        ${dates.gte ? Prisma.sql`AND created_at >= ${dates.gte}` : Prisma.empty}
+        ${dates.lte ? Prisma.sql`AND created_at <= ${dates.lte}` : Prisma.empty}
+        AND (
+          metadata->>'eventType' = ${query.type}
+          ${off ? Prisma.sql`OR metadata->>'eventType' = 'blower_cycle_rest'` : Prisma.empty}
+          OR (
+            metadata->>'eventType' IN ('aeration_state_change', 'blower_cycle_on')
+            AND ${off ? Prisma.sql`(${legacyOff})` : Prisma.sql`NOT (${legacyOff})`}
+          )
+        )
+      ORDER BY created_at DESC, notification_id DESC
+      LIMIT ${query.limit} OFFSET ${query.offset}
+    `;
   }
 
   async getOverview(userId: string, machineId: string) {

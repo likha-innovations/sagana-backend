@@ -340,12 +340,14 @@ describe('Machine read access', () => {
       });
     });
 
-    it('applies event-type filter in database query before pagination', async () => {
+    it('includes sprinkler aliases in the database filter before pagination', async () => {
       prisma.user.findUnique.mockResolvedValue({ barangayId: 'brgy_176' });
       prisma.notification.findMany.mockResolvedValue([]);
 
       await request(app.getHttpServer())
-        .get('/machines/neo2/automation-logs?type=blower_on&offset=0&limit=10')
+        .get(
+          '/machines/neo2/automation-logs?type=sprinkler_on&offset=0&limit=10',
+        )
         .auth('valid', { type: 'bearer' })
         .expect(200);
 
@@ -355,7 +357,10 @@ describe('Machine read access', () => {
             machineId: 'neo2',
             type: 'automation',
             OR: expect.arrayContaining([
-              { metadata: { path: ['eventType'], equals: 'blower_on' } },
+              { metadata: { path: ['eventType'], equals: 'sprinkler_on' } },
+              {
+                metadata: { path: ['eventType'], equals: 'sprinkler_pulse_on' },
+              },
             ]),
           }),
           skip: 0,

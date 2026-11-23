@@ -4,11 +4,7 @@ ALTER TABLE "machines" ADD COLUMN IF NOT EXISTS "configuration" JSONB DEFAULT '{
 -- Data Migration: Migrate existing automation_logs into notifications (if table exists)
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'automation_logs'
-    ) THEN
+    IF to_regclass('automation_logs') IS NOT NULL THEN
         INSERT INTO "notifications" (
             "notification_id",
             "barangay_id",
@@ -28,20 +24,25 @@ BEGIN
             a."machine_id",
             a."batch_id",
             'automation',
-            CASE 
+            CASE
                 WHEN a."type" IN ('emergency_stop', 'estop_activated', 'e_stop', 'alarm') THEN 'critical'
                 ELSE 'info'
             END,
             'Automation Event',
             a."message",
-            jsonb_build_object('eventType', a."type") || COALESCE(a."metadata", '{}'::jsonb),
+            CASE jsonb_typeof(a."metadata")
+                WHEN 'object' THEN a."metadata"
+                ELSE CASE
+                    WHEN a."metadata" IS NULL THEN '{}'::jsonb
+                    ELSE jsonb_build_object('legacyMetadata', a."metadata")
+                END
+            END || jsonb_build_object('eventType', a."type", 'legacyLogId', a."log_id"),
             false,
             a."created_at"
         FROM "automation_logs" a
         JOIN "machines" m ON m."machine_id" = a."machine_id";
 
-        -- DropTable: drop automation_logs table after backfill
-        DROP TABLE "automation_logs";
+        -- Retain automation_logs for verification via metadata.legacyLogId.
     END IF;
 END $$;
 

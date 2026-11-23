@@ -21,6 +21,7 @@ describe('TelemetryService', () => {
     };
 
     const prismaMock: any = {
+      $queryRaw: jest.fn(),
       machine: {
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -66,6 +67,7 @@ describe('TelemetryService', () => {
             broadcastStatus: jest.fn(),
             broadcastAutomationLog: jest.fn(),
             broadcastNotification: jest.fn(),
+            broadcastMachineUpdated: jest.fn(),
           },
         },
       ],
@@ -188,7 +190,12 @@ describe('TelemetryService', () => {
     });
   });
 
-  it('should not treat absent speed as a stopped blower for blower_cycle_on', async () => {
+  it.each([
+    [{}, 'blower_on'],
+    [{ speed: '0' }, 'blower_on'],
+    [{ speed: 0 }, 'blower_off'],
+    [{ state: 'OFF' }, 'blower_off'],
+  ])('classifies blower_cycle_on with %j as %s', async (metadata, expected) => {
     const prisma = (service as any).prisma;
     prisma.machine.findUnique.mockResolvedValue({
       id: 'machine_1',
@@ -200,7 +207,7 @@ describe('TelemetryService', () => {
     const eventPayload = Buffer.from(
       JSON.stringify({
         type: 'blower_cycle_on',
-        state: 'ON',
+        metadata,
       }),
     );
 
@@ -214,7 +221,7 @@ describe('TelemetryService', () => {
         data: expect.objectContaining({
           type: 'automation',
           metadata: expect.objectContaining({
-            eventType: 'blower_on',
+            eventType: expected,
           }),
         }),
       }),
@@ -223,11 +230,9 @@ describe('TelemetryService', () => {
 
   it('should atomically persist Device Twin configuration on AERATION_CONFIG command', async () => {
     const prisma = (service as any).prisma;
-    prisma.machine.findUnique.mockResolvedValue({
-      id: 'machine_1',
-      configuration: { initial: true },
-      barangayId: 'brgy_1',
-    });
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'machine_1', configuration: { initial: true } },
+    ]);
     prisma.machine.update.mockResolvedValue({
       id: 'machine_1',
       barangayId: 'brgy_1',
@@ -254,6 +259,10 @@ describe('TelemetryService', () => {
         },
       }),
     );
+    expect(gateway.broadcastMachineUpdated).toHaveBeenCalledWith({
+      machineId: 'machine_1',
+      barangayId: 'brgy_1',
+    });
   });
 
   it('should create and broadcast a warning notification when machine transitions to offline', async () => {
