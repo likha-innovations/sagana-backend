@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { Prisma, type Notification } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { LoggerService } from '../../core/logger/logger.service';
 import { MqttService } from '../../infrastructure/mqtt/mqtt.service';
@@ -11,6 +12,23 @@ import { TelemetryGateway } from '../telemetry/telemetry.gateway';
 import type { RegisterMachineDto } from './dto/register-machine.dto';
 import type { UpdateMachineDto } from './dto/update-machine.dto';
 import type { AutomationLogsQueryDto } from './dto/automation-logs-query.dto';
+
+function getEventTypeAliases(type: string): string[] {
+  switch (type) {
+    case 'sprinkler_on':
+      return ['sprinkler_on', 'moisture_dosing_start', 'sprinkler_pulse_on'];
+    case 'sprinkler_off':
+      return [
+        'sprinkler_off',
+        'moisture_recovery_reached',
+        'sprinkler_pulse_rest',
+      ];
+    case 'emergency_stop':
+      return ['emergency_stop', 'estop_activated', 'e_stop'];
+    default:
+      return [type];
+  }
+}
 
 @Injectable()
 export class MachinesService {
@@ -284,44 +302,168 @@ export class MachinesService {
   ) {
     await this.findOne(userId, machineId);
 
-    const where: {
-      machineId: string;
-      type?: string;
-      createdAt?: { gte?: Date; lte?: Date };
-    } = { machineId };
+    const where: Prisma.NotificationWhereInput = {
+      machineId,
+      type: 'automation',
+    };
 
-    if (query.type) {
-      where.type = query.type;
+    const dates: { gte?: Date; lte?: Date } = {};
+    if (query.startDate) dates.gte = new Date(query.startDate);
+    if (query.endDate) {
+      dates.lte = query.endDate.includes('T')
+        ? new Date(query.endDate)
+        : new Date(`${query.endDate}T23:59:59.999Z`);
+    }
+    if (dates.gte || dates.lte) where.createdAt = dates;
+
+    const isBlowerFilter =
+      query.type === 'blower_on' || query.type === 'blower_off';
+    if (query.type && !isBlowerFilter) {
+      const aliases = getEventTypeAliases(query.type);
+      where.OR = aliases.map((alias) => ({
+        metadata: {
+          path: ['eventType'],
+          equals: alias,
+        },
+      }));
     }
 
-    if (query.startDate || query.endDate) {
-      where.createdAt = {};
-      if (query.startDate) {
-        where.createdAt.gte = new Date(query.startDate);
-      }
-      if (query.endDate) {
-        where.createdAt.lte = query.endDate.includes('T')
-          ? new Date(query.endDate)
-          : new Date(`${query.endDate}T23:59:59.999Z`);
-      }
-    }
+    const logs = isBlowerFilter
+      ? await this.findBlowerLogs(machineId, query, dates)
+      : await this.prisma.notification.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: query.limit,
+          skip: query.offset,
+        });
 
-    const logs = await this.prisma.automationLog.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: query.limit,
-      skip: query.offset,
+    return logs.map((log) => {
+      const meta = (log.metadata as Record<string, unknown> | null) ?? {};
+      let eventType = (meta.eventType as string) || log.type;
+
+      if (
+        eventType === 'aeration_state_change' ||
+        eventType === 'blower_cycle_on' ||
+        eventType === 'blower_cycle_rest'
+      ) {
+        const rawSpeed =
+          typeof meta.speed === 'number' ? meta.speed : undefined;
+        const stateStr = (
+          typeof meta.state === 'string' ? meta.state : ''
+        ).toUpperCase();
+        const isOff =
+          eventType === 'blower_cycle_rest' ||
+          stateStr.includes('OFF') ||
+          stateStr.includes('IDLE') ||
+          rawSpeed === 0;
+        eventType = isOff ? 'blower_off' : 'blower_on';
+      } else if (
+        eventType === 'moisture_dosing_start' ||
+        eventType === 'sprinkler_pulse_on'
+      ) {
+        eventType = 'sprinkler_on';
+      } else if (
+        eventType === 'moisture_recovery_reached' ||
+        eventType === 'sprinkler_pulse_rest'
+      ) {
+        eventType = 'sprinkler_off';
+      } else if (eventType === 'estop_activated' || eventType === 'e_stop') {
+        eventType = 'emergency_stop';
+      }
+
+      let formattedMessage = log.message;
+      const lower = log.message.toLowerCase();
+      const durationStr =
+        typeof meta.durationMinutes === 'number' ||
+        typeof meta.durationMinutes === 'string'
+          ? String(meta.durationMinutes)
+          : undefined;
+      const targetMoistStr =
+        typeof meta.targetMoisture === 'number' ||
+        typeof meta.targetMoisture === 'string'
+          ? String(meta.targetMoisture)
+          : undefined;
+
+      if (
+        lower.includes('state transition') ||
+        lower.includes('pulse') ||
+        lower.includes('dosing sequence') ||
+        lower.includes('hysteresis') ||
+        lower.includes('test button')
+      ) {
+        if (eventType === 'blower_on') {
+          formattedMessage = `The air blower has been turned on and will be running for ${durationStr ?? '5'} minutes.`;
+        } else if (eventType === 'blower_off') {
+          formattedMessage = `The air blower has been turned off and will be turned off for ${durationStr ?? '15'} minutes.`;
+        } else if (eventType === 'sprinkler_on') {
+          formattedMessage = `The sprinkler has been turned on and will be running until moisture hits ${targetMoistStr ?? '60'}%.`;
+        } else if (eventType === 'sprinkler_off') {
+          formattedMessage = `The sprinkler has been turned off as it already reached ${targetMoistStr ?? '60'}%.`;
+        } else if (eventType === 'emergency_stop') {
+          formattedMessage = lower.includes('sprinkler')
+            ? 'The sprinkler has been stopped due to an emergency.'
+            : 'The air blower has been stopped due to an emergency.';
+        }
+      }
+
+      return {
+        id: log.id,
+        machineId: log.machineId,
+        batchId: log.batchId,
+        type: eventType,
+        message: formattedMessage,
+        metadata: log.metadata,
+        createdAt: log.createdAt.toISOString(),
+      };
     });
+  }
 
-    return logs.map((log) => ({
-      id: log.id,
-      machineId: log.machineId,
-      batchId: log.batchId,
-      type: log.type,
-      message: log.message,
-      metadata: log.metadata,
-      createdAt: log.createdAt.toISOString(),
-    }));
+  private findBlowerLogs(
+    machineId: string,
+    query: AutomationLogsQueryDto,
+    dates: { gte?: Date; lte?: Date },
+  ) {
+    const off = query.type === 'blower_off';
+    // Legacy transition records can represent either state. Match the same
+    // numeric zero and state rules as the response mapping before pagination.
+    const legacyOff = Prisma.sql`
+      COALESCE(metadata->'speed' = '0'::jsonb, false)
+      OR COALESCE(
+        jsonb_typeof(metadata->'state') = 'string'
+        AND metadata->>'state' ~* '(off|idle)',
+        false
+      )
+    `;
+    return this.prisma.$queryRaw<
+      Pick<
+        Notification,
+        | 'id'
+        | 'machineId'
+        | 'batchId'
+        | 'type'
+        | 'message'
+        | 'metadata'
+        | 'createdAt'
+      >[]
+    >`
+      SELECT notification_id AS id, machine_id AS "machineId",
+             batch_id AS "batchId", type, message, metadata,
+             created_at AS "createdAt"
+      FROM notifications
+      WHERE machine_id = ${machineId} AND type = 'automation'
+        ${dates.gte ? Prisma.sql`AND created_at >= ${dates.gte}` : Prisma.empty}
+        ${dates.lte ? Prisma.sql`AND created_at <= ${dates.lte}` : Prisma.empty}
+        AND (
+          metadata->>'eventType' = ${query.type}
+          ${off ? Prisma.sql`OR metadata->>'eventType' = 'blower_cycle_rest'` : Prisma.empty}
+          OR (
+            metadata->>'eventType' IN ('aeration_state_change', 'blower_cycle_on')
+            AND ${off ? Prisma.sql`(${legacyOff})` : Prisma.sql`NOT (${legacyOff})`}
+          )
+        )
+      ORDER BY created_at DESC, notification_id DESC
+      LIMIT ${query.limit} OFFSET ${query.offset}
+    `;
   }
 
   async getOverview(userId: string, machineId: string) {
@@ -353,18 +495,41 @@ export class MachinesService {
         actuators.pump_speed_percent > 0),
     );
 
+    const blowerEventTypes = [
+      'blower_on',
+      'blower_off',
+      'blower_cycle_on',
+      'blower_cycle_rest',
+      'emergency_stop',
+      'e_stop',
+    ];
+    const sprinklerEventTypes = [
+      'sprinkler_on',
+      'sprinkler_off',
+      'sprinkler_pulse_on',
+      'sprinkler_pulse_rest',
+      'moisture_dosing_start',
+      'moisture_recovery_reached',
+    ];
+
     const [latestBlowerLog, latestSprinklerLog] = await Promise.all([
-      this.prisma.automationLog.findFirst({
+      this.prisma.notification.findFirst({
         where: {
           machineId,
-          type: { in: ['blower_on', 'blower_off', 'emergency_stop'] },
+          type: 'automation',
+          OR: blowerEventTypes.map((t) => ({
+            metadata: { path: ['eventType'], equals: t },
+          })),
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
-      this.prisma.automationLog.findFirst({
+      this.prisma.notification.findFirst({
         where: {
           machineId,
-          type: { in: ['sprinkler_on', 'sprinkler_off'] },
+          type: 'automation',
+          OR: sprinklerEventTypes.map((t) => ({
+            metadata: { path: ['eventType'], equals: t },
+          })),
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
@@ -375,8 +540,44 @@ export class MachinesService {
     const sprinklerMeta =
       (latestSprinklerLog?.metadata as Record<string, unknown> | null) ?? null;
 
+    const automation =
+      (telemetryPayload?.automation as Record<string, unknown> | null) ?? null;
+    const remainingMs =
+      typeof automation?.aeration_remaining_ms === 'number'
+        ? automation.aeration_remaining_ms
+        : typeof actuators?.blower_remaining_ms === 'number'
+          ? actuators.blower_remaining_ms
+          : null;
+
+    let dynamicUntil: string | null = null;
+    if (remainingMs !== null && remainingMs > 0) {
+      const totalSec = Math.round(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      if (mins >= 60) {
+        const hrs = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        dynamicUntil = `${hrs}h ${remMins}m`;
+      } else if (mins > 0) {
+        dynamicUntil = `${mins}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        dynamicUntil = `0:${secs.toString().padStart(2, '0')}`;
+      }
+    }
+
     const aerationUntil =
-      (blowerMeta?.until as string) || (blowerRunning ? '6:07' : '15 min');
+      dynamicUntil ||
+      (blowerMeta?.until as string) ||
+      (blowerRunning ? '10 min' : '5 min');
+
+    const targetEndTime =
+      remainingMs !== null && remainingMs > 0
+        ? new Date(
+            (latestTelemetry?.recordedAt
+              ? new Date(latestTelemetry.recordedAt).getTime()
+              : Date.now()) + remainingMs,
+          ).toISOString()
+        : null;
 
     const sprinklerUntil =
       (sprinklerMeta?.until as string) || (pumpRunning ? '60%' : '45%');
@@ -386,11 +587,15 @@ export class MachinesService {
       batchId: activeBatch?.id ?? null,
       currentWeight: activeBatch?.totalWeight ?? null,
       recordedAt: (latestTelemetry?.recordedAt ?? new Date()).toISOString(),
+      serverTime: new Date().toISOString(),
+      configuration: machine.configuration ?? {},
       automations: [
         {
           kind: 'aeration' as const,
           enabled: blowerRunning,
           until: aerationUntil,
+          targetEndTime,
+          remainingMs,
         },
         {
           kind: 'sprinkler' as const,

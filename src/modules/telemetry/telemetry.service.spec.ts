@@ -20,6 +20,31 @@ describe('TelemetryService', () => {
       broadcastTelemetry: jest.fn(),
     };
 
+    const prismaMock: any = {
+      $queryRaw: jest.fn(),
+      machine: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      telemetryLog: {
+        create: jest.fn(),
+      },
+      notification: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            id: 'notif_1',
+            isRead: false,
+            readAt: null,
+            createdAt: new Date(),
+            ...data,
+          }),
+        ),
+      },
+    };
+    prismaMock.$transaction = jest
+      .fn()
+      .mockImplementation((cb) => cb(prismaMock));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TelemetryService,
@@ -29,35 +54,7 @@ describe('TelemetryService', () => {
         },
         {
           provide: PrismaService,
-          useValue: {
-            machine: {
-              findUnique: jest.fn(),
-              update: jest.fn(),
-            },
-            telemetryLog: {
-              create: jest.fn(),
-            },
-            automationLog: {
-              create: jest.fn().mockImplementation(({ data }) =>
-                Promise.resolve({
-                  id: 'log_1',
-                  createdAt: new Date(),
-                  ...data,
-                }),
-              ),
-            },
-            notification: {
-              create: jest.fn().mockImplementation(({ data }) =>
-                Promise.resolve({
-                  id: 'notif_1',
-                  isRead: false,
-                  readAt: null,
-                  createdAt: new Date(),
-                  ...data,
-                }),
-              ),
-            },
-          },
+          useValue: prismaMock,
         },
         {
           provide: LoggerService,
@@ -70,6 +67,7 @@ describe('TelemetryService', () => {
             broadcastStatus: jest.fn(),
             broadcastAutomationLog: jest.fn(),
             broadcastNotification: jest.fn(),
+            broadcastMachineUpdated: jest.fn(),
           },
         },
       ],
@@ -125,14 +123,21 @@ describe('TelemetryService', () => {
       eventPayload,
     );
 
-    expect(prisma.automationLog.create).toHaveBeenCalledWith({
+    expect(prisma.notification.create).toHaveBeenCalledWith({
       data: {
+        barangayId: 'brgy_1',
         machineId: 'machine_1',
         batchId: 'batch_1',
-        type: 'blower_on',
+        type: 'automation',
+        severity: 'info',
+        title: 'Composter 1: Aeration Blower Started',
         message:
           'The air blower has been turned on and will be running for 5 minutes.',
-        metadata: { durationMinutes: 5 },
+        metadata: {
+          durationMinutes: 5,
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          eventType: 'blower_on',
+        },
       },
     });
 
@@ -166,14 +171,97 @@ describe('TelemetryService', () => {
       eventPayload,
     );
 
-    expect(prisma.automationLog.create).toHaveBeenCalledWith({
+    expect(prisma.notification.create).toHaveBeenCalledWith({
       data: {
+        barangayId: 'brgy_1',
         machineId: 'machine_1',
         batchId: null,
-        type: 'sprinkler_off',
+        type: 'automation',
+        severity: 'info',
+        title: 'Composter 1: Sprinkler Dosing Stopped',
         message: 'The sprinkler has been turned off as it already reached 60%.',
-        metadata: { type: 'sprinkler_off', targetMoisture: 60 },
+        metadata: {
+          type: 'sprinkler_off',
+          targetMoisture: 60,
+          macAddress: 'AA:BB:CC:DD:EE:FF',
+          eventType: 'sprinkler_off',
+        },
       },
+    });
+  });
+
+  it.each([
+    [{}, 'blower_on'],
+    [{ speed: '0' }, 'blower_on'],
+    [{ speed: 0 }, 'blower_off'],
+    [{ state: 'OFF' }, 'blower_off'],
+  ])('classifies blower_cycle_on with %j as %s', async (metadata, expected) => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+
+    const eventPayload = Buffer.from(
+      JSON.stringify({
+        type: 'blower_cycle_on',
+        metadata,
+      }),
+    );
+
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+      eventPayload,
+    );
+
+    expect(prisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'automation',
+          metadata: expect.objectContaining({
+            eventType: expected,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should atomically persist Device Twin configuration on AERATION_CONFIG command', async () => {
+    const prisma = (service as any).prisma;
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'machine_1', configuration: { initial: true } },
+    ]);
+    prisma.machine.update.mockResolvedValue({
+      id: 'machine_1',
+      barangayId: 'brgy_1',
+    });
+
+    await service.sendCommandToDevice('AA:BB:CC:DD:EE:FF', {
+      action: 'AERATION_CONFIG',
+      payload: { mode: 'custom', onMinutes: 5, offMinutes: 15 },
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.machine.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'machine_1' },
+        data: {
+          configuration: expect.objectContaining({
+            initial: true,
+            aeration: expect.objectContaining({
+              mode: 'custom',
+              onMinutes: 5,
+              offMinutes: 15,
+            }),
+          }),
+        },
+      }),
+    );
+    expect(gateway.broadcastMachineUpdated).toHaveBeenCalledWith({
+      machineId: 'machine_1',
+      barangayId: 'brgy_1',
     });
   });
 
@@ -199,6 +287,7 @@ describe('TelemetryService', () => {
         type: 'machine',
         severity: 'warning',
         title: 'Composter 1 Offline',
+        message: 'Composter 1 has disconnected or gone offline.',
       }),
     });
 
@@ -234,6 +323,7 @@ describe('TelemetryService', () => {
         type: 'machine',
         severity: 'info',
         title: 'Composter 1 Back Online',
+        message: 'Composter 1 has reconnected and resumed telemetry streaming.',
       }),
     });
 
@@ -305,6 +395,77 @@ describe('TelemetryService', () => {
     );
   });
 
+  it('should create and broadcast info notifications for top lid and middle door events without mac in message', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+
+    const doorEvents = [
+      {
+        type: 'top_lid_opened',
+        expectedTitle: 'Composter 1 Top Lid Opened',
+        message: 'Feedstock top lid opened',
+      },
+      {
+        type: 'top_lid_closed',
+        expectedTitle: 'Composter 1 Top Lid Closed',
+        message: 'Feedstock top lid closed',
+      },
+      {
+        type: 'middle_door_opened',
+        expectedTitle: 'Composter 1 Middle Door Opened',
+        message: 'Compost middle door opened',
+      },
+      {
+        type: 'middle_door_closed',
+        expectedTitle: 'Composter 1 Middle Door Closed',
+        message: 'Compost middle door closed',
+      },
+    ];
+
+    for (const evt of doorEvents) {
+      prisma.notification.create.mockClear();
+      gateway.broadcastNotification.mockClear();
+
+      const payload = Buffer.from(
+        JSON.stringify({
+          type: evt.type,
+          message: evt.message,
+        }),
+      );
+
+      await service.handleIncomingMqttMessage(
+        'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+        payload,
+      );
+
+      expect(prisma.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          barangayId: 'brgy_1',
+          machineId: 'machine_1',
+          type: 'machine',
+          severity: 'info',
+          title: evt.expectedTitle,
+          message: `Composter 1: ${evt.message}`,
+        }),
+      });
+
+      expect(gateway.broadcastNotification).toHaveBeenCalledWith(
+        'brgy_1',
+        expect.objectContaining({
+          barangayId: 'brgy_1',
+          type: 'machine',
+          severity: 'info',
+          title: evt.expectedTitle,
+        }),
+      );
+    }
+  });
+
   it('should create and broadcast a critical sensor notification when temperature exceeds threshold', async () => {
     const prisma = (service as any).prisma;
     prisma.machine.findUnique.mockResolvedValue({
@@ -344,18 +505,13 @@ describe('TelemetryService', () => {
     );
   });
 
-  it('should not allow event metadata to override macAddress and logId in notification metadata', async () => {
+  it('should not allow event metadata to override macAddress and eventType in notification metadata', async () => {
     const prisma = (service as any).prisma;
     prisma.machine.findUnique.mockResolvedValue({
       id: 'machine_1',
       name: 'Composter 1',
       barangayId: 'brgy_1',
       batches: [{ id: 'batch_1', status: 'active' }],
-    });
-    prisma.automationLog.create.mockResolvedValue({
-      id: 'authoritative_log_123',
-      machineId: 'machine_1',
-      type: 'emergency_stop',
     });
 
     const maliciousPayload = Buffer.from(
@@ -364,7 +520,7 @@ describe('TelemetryService', () => {
         message: 'E-stop pressed',
         metadata: {
           macAddress: 'SPOOFED_MAC',
-          logId: 'SPOOFED_LOG',
+          eventType: 'SPOOFED_TYPE',
           customField: 'valid_data',
         },
       }),
@@ -379,7 +535,7 @@ describe('TelemetryService', () => {
       data: expect.objectContaining({
         metadata: expect.objectContaining({
           macAddress: 'AA:BB:CC:DD:EE:FF',
-          logId: 'authoritative_log_123',
+          eventType: 'emergency_stop',
           customField: 'valid_data',
         }),
       }),

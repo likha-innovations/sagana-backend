@@ -22,7 +22,7 @@ export class TelemetryController {
   @ApiOperation({
     summary: '[Shared] Send a device command',
     description:
-      'Publishes the supplied action and optional payload to the MQTT command topic. Success indicates dispatch to the broker, not confirmation from the device. Any valid Clerk token can call this endpoint; it does not check device ownership or barangay.',
+      'Publishes the supplied action and optional payload to the MQTT command topic. Success indicates dispatch to the broker, not confirmation from the device. AERATION_CONFIG also persists the configuration; persistence failure is reported even if the command was dispatched. Any valid Clerk token can call this endpoint; it does not check device ownership or barangay.',
   })
   @ApiBody({
     type: PublishCommandDto,
