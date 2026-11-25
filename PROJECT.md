@@ -45,7 +45,7 @@ Backend API for Sagana platform built with NestJS 11, Prisma 7, PostgreSQL, Cler
   - Socket.IO gateway initialized under `/telemetry` namespace (`TelemetryGateway`).
   - Bridges hardware MQTT messages (`sagana/ping`, `sagana/pong`) to frontend WebSocket clients via `mqtt:ping` and `mqtt:pong` events.
 - **Global Behaviors**:
-  - Swagger UI available at `/api/docs` (`cleanupOpenApiDoc` for Zod compatibility).
+  - Swagger UI available at `/docs` (`cleanupOpenApiDoc` for Zod compatibility).
   - Global response formatting wrapped via `TransformResponseInterceptor` (`{ success: true, data: T, timestamp }`).
   - Global error handling via `GlobalExceptionFilter`.
 - **Git & Commits**:

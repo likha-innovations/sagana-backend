@@ -10,7 +10,7 @@ By default, **every route in the backend is guarded and private**.
 
 The [`ClerkAuthGuard`](../../src/core/guards/clerk-auth.guard.ts) is registered as a global guard in [`AppModule`](../../src/app.module.ts):
 
-Swagger at `/api/docs` labels each endpoint by access:
+Swagger at `/docs` labels each endpoint by access:
 
 1. **Public**: `@Public()` bypasses the Clerk guard; no token is required.
 2. **Shared**: a valid Clerk bearer token is required. Admins and operators can call these endpoints, subject to any profile or barangay restrictions described on the operation.
