@@ -344,7 +344,9 @@ describe('TelemetryService', () => {
       name: 'Composter 1',
       barangayId: 'brgy_1',
       status: 'offline',
-      configuration: { aeration: { mode: 'custom', onMinutes: 10, offMinutes: 5 } },
+      configuration: {
+        aeration: { mode: 'custom', onMinutes: 10, offMinutes: 5 },
+      },
     });
     prisma.machine.update.mockResolvedValue({});
 
