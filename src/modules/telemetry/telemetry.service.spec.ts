@@ -337,6 +337,58 @@ describe('TelemetryService', () => {
     );
   });
 
+  it('should push AERATION_CONFIG to device on reconnect when configuration.aeration exists', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      status: 'offline',
+      configuration: { aeration: { mode: 'custom', onMinutes: 10, offMinutes: 5 } },
+    });
+    prisma.machine.update.mockResolvedValue({});
+
+    const statusPayload = Buffer.from(JSON.stringify({ status: 'online' }));
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/status',
+      statusPayload,
+    );
+
+    expect(mqttService.publish).toHaveBeenCalledWith(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/commands',
+      expect.objectContaining({
+        action: 'AERATION_CONFIG',
+        payload: expect.objectContaining({ onMinutes: 10, offMinutes: 5 }),
+      }),
+    );
+  });
+
+  it('should NOT push AERATION_CONFIG on reconnect when configuration.aeration is absent', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      status: 'offline',
+      configuration: null,
+    });
+    prisma.machine.update.mockResolvedValue({});
+
+    const statusPayload = Buffer.from(JSON.stringify({ status: 'online' }));
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/status',
+      statusPayload,
+    );
+
+    const aerationPublish = (mqttService.publish as jest.Mock).mock.calls.find(
+      (args: unknown[]) =>
+        typeof args[1] === 'object' &&
+        args[1] !== null &&
+        (args[1] as Record<string, unknown>).action === 'AERATION_CONFIG',
+    );
+    expect(aerationPublish).toBeUndefined();
+  });
+
   it('should not duplicate notifications if status has not changed', async () => {
     const prisma = (service as any).prisma;
     prisma.machine.findUnique.mockResolvedValue({

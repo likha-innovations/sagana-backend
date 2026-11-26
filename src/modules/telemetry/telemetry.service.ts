@@ -44,7 +44,7 @@ export class TelemetryService implements OnModuleInit {
 
         const machine = await this.prisma.machine.findUnique({
           where: { macAddress },
-          select: { id: true, name: true, barangayId: true, status: true },
+          select: { id: true, name: true, barangayId: true, status: true, configuration: true },
         });
 
         if (!machine) {
@@ -76,6 +76,19 @@ export class TelemetryService implements OnModuleInit {
           await this.mqttService.publish(
             `sagana/devices/${macAddress}/commands`,
             { action: 'SET_NAME', name: machine.name },
+          );
+        }
+
+        // Device Twin: push saved aeration config on reconnect
+        const aerationConfig = (machine.configuration as Record<string, unknown> | null)?.aeration as Record<string, unknown> | undefined;
+        if (isOnline && aerationConfig && Object.keys(aerationConfig).length > 0) {
+          await this.mqttService.publish(
+            `sagana/devices/${macAddress}/commands`,
+            { action: 'AERATION_CONFIG', payload: aerationConfig },
+          );
+          this.logger.log(
+            `📡 [Device Twin] Pushed AERATION_CONFIG to ${macAddress} on reconnect`,
+            TelemetryService.name,
           );
         }
 
