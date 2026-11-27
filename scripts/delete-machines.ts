@@ -91,6 +91,15 @@ async function main() {
         where: { batchId: { in: batchIds } },
       });
 
+      const deletedNotifications = await tx.notification.deleteMany({
+        where: {
+          OR: [
+            { machineId: { in: machineIds } },
+            { batchId: { in: batchIds } },
+          ],
+        },
+      });
+
       const deletedBatches = await tx.compostBatch.deleteMany({
         where: { id: { in: batchIds } },
       });
@@ -105,6 +114,7 @@ async function main() {
 
       return {
         machines: deletedMachines.count,
+        notifications: deletedNotifications.count,
         sensors: deletedSensors.count,
         sensorReadings: deletedSensorReadings.count,
         telemetryLogs: deletedTelemetry.count,
