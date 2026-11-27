@@ -78,8 +78,6 @@ src/modules/
 │   ├── batches.module.ts           # Module definition
 │   └── *.spec.ts                   # Unit tests
 ├── feedstocks/
-│   ├── dto/
-│   │   └── feedstock.dto.ts        # Zod schema for feedstock records
 │   ├── feedstocks.controller.ts    # Public endpoint (/feedstocks)
 │   ├── feedstocks.service.ts       # Feedstocks data retrieval
 │   └── feedstocks.module.ts        # Module definition
