@@ -122,6 +122,7 @@ export class BarangaysController {
     'Admin access and barangay assignment required.',
     'Admin access required',
   )
+  @ApiErrorExample(404, 'Barangay not found.', 'Barangay not found')
   rotateCode(@CurrentUserId() userId: string) {
     return this.barangaysService.rotateCode(userId);
   }

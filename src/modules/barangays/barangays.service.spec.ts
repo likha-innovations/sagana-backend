@@ -6,6 +6,7 @@ describe('Barangay codes', () => {
     user: { findUnique: jest.fn() },
     barangay: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -58,6 +59,7 @@ describe('Barangay codes', () => {
 
   it('retries a duplicate and rotates to a different code', async () => {
     prisma.user.findUnique.mockResolvedValue({ barangayId: 'b1' });
+    prisma.barangay.findUnique.mockResolvedValue({ id: 'b1' });
     prisma.barangay.updateMany
       .mockRejectedValueOnce({ code: 'P2002' })
       .mockResolvedValueOnce({ count: 1 });
@@ -68,5 +70,37 @@ describe('Barangay codes', () => {
       where: { id: 'b1', OR: [{ code: null }, { code: { not: code } }] },
       data: { code },
     });
+  });
+
+  it('throws 404 without looping when the admin barangay does not exist', async () => {
+    prisma.user.findUnique.mockResolvedValue({ barangayId: 'missing' });
+    prisma.barangay.findUnique.mockResolvedValue(null);
+    await expect(service.rotateCode('admin')).rejects.toMatchObject({
+      status: 404,
+      message: 'Barangay not found',
+    });
+    expect(prisma.barangay.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('throws 500 after max attempts on repeated unique collisions', async () => {
+    prisma.user.findUnique.mockResolvedValue({ barangayId: 'b1' });
+    prisma.barangay.findUnique.mockResolvedValue({ id: 'b1' });
+    prisma.barangay.updateMany.mockRejectedValue({ code: 'P2002' });
+    await expect(service.rotateCode('admin')).rejects.toMatchObject({
+      status: 500,
+      message: 'Failed to generate unique barangay code',
+    });
+    expect(prisma.barangay.updateMany).toHaveBeenCalledTimes(5);
+  });
+
+  it('throws 500 after max attempts when updateMany never updates a row', async () => {
+    prisma.user.findUnique.mockResolvedValue({ barangayId: 'b1' });
+    prisma.barangay.findUnique.mockResolvedValue({ id: 'b1' });
+    prisma.barangay.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.rotateCode('admin')).rejects.toMatchObject({
+      status: 500,
+      message: 'Failed to generate unique barangay code',
+    });
+    expect(prisma.barangay.updateMany).toHaveBeenCalledTimes(5);
   });
 });
