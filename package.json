@@ -78,7 +78,7 @@
     "mermaid": "^11.16.1",
     "prettier": "^3.4.2",
     "prisma": "^7.9.1",
-    "supertest": "^7.0.0",
+    "supertest": "^7.3.2",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
