@@ -66,11 +66,11 @@ pnpm exec prisma generate
 pnpm run start
 ```
 
-The server listens on port 3000 by default. `API_PREFIX` controls the route prefix; the example configuration uses `api`. Apply database migrations only to the intended database. See [database setup](docs/database/schema-and-design.md) and the [developer guide](docs/development/getting-started.md).
+The server listens on port 3000 by default. Apply database migrations only to the intended database. See [database setup](docs/database/schema-and-design.md) and the [developer guide](docs/development/getting-started.md).
 
 ## API and documentation
 
-With the server running, open [Swagger UI](http://localhost:3000/api/docs). With the example `API_PREFIX=api`, the health endpoint is `http://localhost:3000/api/health`. A [Bruno collection](bruno/) contains example requests.
+With the server running, open [Swagger UI](http://localhost:3000/docs). The health endpoint is `http://localhost:3000/health`. A [Bruno collection](bruno/) contains example requests.
 
 Machine registration and updates use camelCase fields such as `macAddress` and `wifiSsid`. See [machine endpoints](docs/modules/machines.md) and [telemetry](docs/modules/telemetry.md).
 

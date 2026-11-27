@@ -46,9 +46,15 @@ export class NotificationsService {
     const barangayId = await this.getBarangayId(userId);
     if (!barangayId) return [];
 
+    // Routine automation logs are reserved for machine settings automation logs view, not notification bell
+    // Critical automation alerts (emergency stop, hardware alarm) remain in notification bell
     return this.prisma.notification.findMany({
       where: {
         barangayId,
+        NOT: {
+          type: 'automation',
+          severity: { not: 'critical' },
+        },
         ...(query.unreadOnly ? { isRead: false } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -61,9 +67,14 @@ export class NotificationsService {
     const barangayId = await this.getBarangayId(userId);
     if (!barangayId) return { unreadCount: 0 };
 
+    // Exclude routine automation logs from the notification badge counter, while keeping critical alerts
     const unreadCount = await this.prisma.notification.count({
       where: {
         barangayId,
+        NOT: {
+          type: 'automation',
+          severity: { not: 'critical' },
+        },
         isRead: false,
       },
     });
@@ -109,6 +120,10 @@ export class NotificationsService {
     const result = await this.prisma.notification.updateMany({
       where: {
         barangayId,
+        NOT: {
+          type: 'automation',
+          severity: { not: 'critical' },
+        },
         isRead: false,
       },
       data: {

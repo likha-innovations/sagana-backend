@@ -27,9 +27,8 @@
   ```
 - Use built-in NestJS HTTP exceptions (`NotFoundException`, `BadRequestException`, `UnauthorizedException`) with clear human-readable messages.
 
-## 4. API Prefix & Route Discipline
-- **Respect Global Prefix**: Route paths in controllers must never hardcode prefixes (use `@Controller('me')`, never `@Controller('api/me')`).
-- If `process.env.API_PREFIX` is set, `main.ts` will automatically apply the global prefix.
+## 4. Route Discipline
+- **Root-Mounted Routes**: Route paths in controllers must mount directly at the root (use `@Controller('me')`, never `@Controller('api/me')`).
 
 ## 5. Bruno API Collections
 - Every endpoint in the backend must have a corresponding `.bru` file inside `bruno/<module>/`.

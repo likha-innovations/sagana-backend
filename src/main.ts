@@ -15,9 +15,6 @@ async function bootstrap() {
 
   app.enableCors();
 
-  const apiPrefix = process.env.API_PREFIX || '';
-  if (apiPrefix) app.setGlobalPrefix(apiPrefix);
-
   const config = new DocumentBuilder()
     .setTitle('Sagana Backend API')
     .setDescription(
@@ -35,7 +32,7 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, config));
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('docs', app, document);
 
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new TransformResponseInterceptor());
@@ -44,7 +41,7 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
 
   logger.log(
-    `API documentation available at: http://localhost:${port}/api/docs`,
+    `API documentation available at: http://localhost:${port}/docs`,
     'Bootstrap',
   );
 }

@@ -38,7 +38,7 @@ pnpm run start:debug
 The server will start on `http://localhost:3000` with hot-reload enabled.
 
 ### 3. Open API Documentation
-* **Swagger UI:** `http://localhost:3000/api/docs`
+* **Swagger UI:** `http://localhost:3000/docs`
 
 ### 4. Start VitePress Documentation Server
 ```bash
@@ -77,7 +77,7 @@ bruno/
 ### Setting up Environment Variables in Bruno
 1. Open Bruno and choose **Open Collection**.
 2. Select the `sagana-backend/bruno` folder.
-3. Select the `Local` environment (pre-configured with `baseUrl = http://localhost:3000/api`) and set `token` to your Clerk JWT.
+3. Select the `Local` environment (pre-configured with `baseUrl = http://localhost:3000`) and set `token` to your Clerk JWT.
 
 ---
 
