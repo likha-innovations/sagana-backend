@@ -449,6 +449,50 @@ describe('TelemetryService', () => {
     );
   });
 
+  it('should create and broadcast a warning notification when physical collection button is pressed outside collection screen', async () => {
+    const prisma = (service as any).prisma;
+    prisma.machine.findUnique.mockResolvedValue({
+      id: 'machine_1',
+      name: 'Composter 1',
+      barangayId: 'brgy_1',
+      batches: [{ id: 'batch_1', status: 'active' }],
+    });
+
+    const eventPayload = Buffer.from(
+      JSON.stringify({
+        type: 'collection_screen_required',
+        message: 'Open Collection screen first.',
+      }),
+    );
+
+    await service.handleIncomingMqttMessage(
+      'sagana/devices/AA:BB:CC:DD:EE:FF/events',
+      eventPayload,
+    );
+
+    expect(prisma.notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        barangayId: 'brgy_1',
+        machineId: 'machine_1',
+        type: 'machine',
+        severity: 'warning',
+        title: 'Composter 1: Collection Screen Required',
+        message:
+          'To lift or lower the floor of Composter 1, open the Collection or Rejection process screen in the app first.',
+      }),
+    });
+
+    expect(gateway.broadcastNotification).toHaveBeenCalledWith(
+      'brgy_1',
+      expect.objectContaining({
+        barangayId: 'brgy_1',
+        type: 'machine',
+        severity: 'warning',
+        title: 'Composter 1: Collection Screen Required',
+      }),
+    );
+  });
+
   it('should create and broadcast info notifications for top lid and middle door events without mac in message', async () => {
     const prisma = (service as any).prisma;
     prisma.machine.findUnique.mockResolvedValue({

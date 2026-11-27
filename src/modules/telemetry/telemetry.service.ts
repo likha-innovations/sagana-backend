@@ -274,15 +274,22 @@ export class TelemetryService implements OnModuleInit {
           type === 'top_lid_closed' ||
           type === 'middle_door_opened' ||
           type === 'middle_door_closed';
+        const isCollectionNotice = type === 'collection_screen_required';
 
-        const notifType = isDoorEvent ? 'machine' : 'automation';
-        const severity = isCritical ? 'critical' : 'info';
+        const notifType =
+          isDoorEvent || isCollectionNotice ? 'machine' : 'automation';
+        const severity = isCritical
+          ? 'critical'
+          : isCollectionNotice
+            ? 'warning'
+            : 'info';
         const title = this.formatAutomationTitle(
           machine.name || 'Machine',
           type,
         );
-        const notifMessage =
-          isCritical || isDoorEvent
+        const notifMessage = isCollectionNotice
+          ? `To lift or lower the floor of ${machine.name || 'this machine'}, open the Collection or Rejection process screen in the app first.`
+          : isCritical || isDoorEvent
             ? `${machine.name || 'Machine'}: ${message}`
             : message;
 
@@ -320,8 +327,8 @@ export class TelemetryService implements OnModuleInit {
             },
           });
 
-          // Only broadcast to notification bell feed if critical or security/door event
-          if (isCritical || isDoorEvent) {
+          // Only broadcast to notification bell feed if critical, security/door event, or collection screen reminder
+          if (isCritical || isDoorEvent || isCollectionNotice) {
             this.telemetryGateway.broadcastNotification(machine.barangayId, {
               id: notif.id,
               barangayId: notif.barangayId,
@@ -566,6 +573,8 @@ export class TelemetryService implements OnModuleInit {
         return `${prefix}Floor Lowering`;
       case 'actuator_retracted':
         return `${prefix}Floor Lowered`;
+      case 'collection_screen_required':
+        return `${prefix}Collection Screen Required`;
       default:
         return `${prefix}Automation Event (${eventType})`;
     }
