@@ -2,9 +2,16 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { generateBarangayCode, normalizeBarangayCode } from './barangay-code';
+import {
+  BARANGAY_CODE_MAX_ATTEMPTS,
+  generateBarangayCode,
+  isUniqueConstraintError,
+  normalizeBarangayCode,
+} from './barangay-code';
 
 @Injectable()
 export class BarangaysService {
@@ -52,7 +59,13 @@ export class BarangaysService {
 
   async rotateCode(userId: string) {
     const id = await this.adminBarangayId(userId);
-    for (;;) {
+    const barangay = await this.prisma.barangay.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!barangay) throw new NotFoundException('Barangay not found');
+
+    for (let attempt = 0; attempt < BARANGAY_CODE_MAX_ATTEMPTS; attempt++) {
       const code = generateBarangayCode();
       try {
         const result = await this.prisma.barangay.updateMany({
@@ -61,14 +74,12 @@ export class BarangaysService {
         });
         if (result.count) return { code };
       } catch (error: unknown) {
-        if (
-          typeof error !== 'object' ||
-          error === null ||
-          !('code' in error) ||
-          error.code !== 'P2002'
-        )
-          throw error;
+        if (!isUniqueConstraintError(error)) throw error;
       }
     }
+
+    throw new InternalServerErrorException(
+      'Failed to generate unique barangay code',
+    );
   }
 }

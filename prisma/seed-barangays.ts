@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { generateBarangayCode } from '../src/modules/barangays/barangay-code';
+import {
+  BARANGAY_CODE_MAX_ATTEMPTS,
+  generateBarangayCode,
+  isUniqueConstraintError,
+} from '../src/modules/barangays/barangay-code';
 
 export async function seedBarangayCodes(prisma: PrismaClient) {
   const barangays = await prisma.barangay.findMany({
@@ -7,22 +11,23 @@ export async function seedBarangayCodes(prisma: PrismaClient) {
     select: { id: true },
   });
   for (const barangay of barangays) {
-    for (;;) {
+    let assigned = false;
+    for (let attempt = 0; attempt < BARANGAY_CODE_MAX_ATTEMPTS; attempt++) {
       try {
         await prisma.barangay.updateMany({
           where: { id: barangay.id, code: null },
           data: { code: generateBarangayCode() },
         });
+        assigned = true;
         break;
       } catch (error: unknown) {
-        if (
-          typeof error !== 'object' ||
-          error === null ||
-          !('code' in error) ||
-          error.code !== 'P2002'
-        )
-          throw error;
+        if (!isUniqueConstraintError(error)) throw error;
       }
+    }
+    if (!assigned) {
+      throw new Error(
+        `Failed to generate unique code for barangay ${barangay.id}`,
+      );
     }
   }
 }

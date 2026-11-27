@@ -41,4 +41,17 @@ describe('Safe seed helpers', () => {
     ]);
     expect(prisma.barangay.updateMany).toHaveBeenCalledTimes(1);
   });
+
+  it('throws after max attempts if seeding continuously hits unique collisions', async () => {
+    const prisma = {
+      barangay: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'b1' }]),
+        updateMany: jest.fn().mockRejectedValue({ code: 'P2002' }),
+      },
+    };
+    await expect(
+      seedBarangayCodes(prisma as unknown as PrismaClient),
+    ).rejects.toThrow('Failed to generate unique code for barangay b1');
+    expect(prisma.barangay.updateMany).toHaveBeenCalledTimes(5);
+  });
 });

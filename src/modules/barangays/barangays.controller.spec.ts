@@ -25,6 +25,7 @@ describe('Barangay code endpoints', () => {
     },
     barangay: {
       findFirst: jest.fn().mockResolvedValue({ id: 'b1', name: 'Barangay 1' }),
+      findUnique: jest.fn().mockResolvedValue({ id: 'b1' }),
       findUniqueOrThrow: jest.fn().mockResolvedValue({ code: 'ABC123' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
